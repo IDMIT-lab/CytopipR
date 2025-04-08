@@ -1,16 +1,26 @@
-
-#Represent pval interaction
-
-
-# @title Internal - Computes the number of cells for each population
-#
-# @description This function is used internally to computes the number of cells for each population.
-#
-# @param population a character vector providing the population to count the cells belonging to
-# @param samples a character vector providing for each cell the associated biological sample
-#
-# @return a dataframe containing the numbers of cells associated for each population for each sample (rownames = population / colnames = samples)
-#
+#' @title Get Cell Count or Abundance
+#' @description
+#' This function calculates either the raw cell counts or the cell abundance (as percentages) for a specified clustering,
+#' clusters, and samples from the CYTdata object. The result can be either a contingency table (cell count) or a relative abundance table.
+#'
+#' @param CYTdata A Cytometry data object containing the cell clustering and sample data.
+#' @param clustering A string specifying the name of the clustering column to use for analysis.
+#' @param clusters A vector of cluster labels to include. If NULL, all clusters will be used.
+#' @param samples A vector of sample IDs to include in the analysis. If NULL, all samples will be used.
+#' @param type A string specifying the type of output. Either "cellcount" for raw counts or "abundance" for relative percentages.
+#'
+#' @return A table (data.frame) containing either the cell counts or the relative abundance for each cluster-sample combination.
+#' If `type = "cellcount"`, the result will be a table of raw counts. If `type = "abundance"`, the result will be a table of relative abundances (percentages).
+#'
+#' @examples
+#' # Get raw cell counts for specific clusters and samples
+#' cellcount_result <- getCellCount(CYTdata, clustering = "ClusterType", clusters = c("Cluster1", "Cluster2"), samples = c("SampleA", "SampleB"), type = "cellcount")
+#'
+#' # Get abundance (percentage) for the same clusters and samples
+#' abundance_result <- getCellCount(CYTdata, clustering = "ClusterType", clusters = c("Cluster1", "Cluster2"), samples = c("SampleA", "SampleB"), type = "abundance")
+#'
+#' @seealso \code{\link{checkorderClustering}} for clustering order checking function.
+#' @export
 
 getCellCount <- function(CYTdata,
 
@@ -59,31 +69,66 @@ getCellCount <- function(CYTdata,
   }
 }
 
-#' @title Computes differential analysis statistics for cell clusters
+#' @title Run Differential Testing
+#' @description
+#' This function performs differential testing for cell clustering data based on sample group comparisons.
+#' It supports both two-group and multi-group tests, with options for various statistical tests and post-hoc analyses.
+#' The function computes fold change (FC) and adjusts p-values for multiple testing.
+#' The result is stored in the differential testing data within the CYTdata object.
 #'
-#' @description This function aims to identify of differentially abundant clusters.
+#' @param CYTdata A Cytometry data object containing clustering and sample data.
+#' @param clustering A string specifying the name of the clustering column to be analyzed.
+#' @param clusters A vector of cluster labels for the analysis. If NULL, all clusters are used.
+#' @param comparisonSpl A list of sample groups to compare against each other. Must contain at least two elements.
+#' @param referenceSplName A string specifying the name of the reference sample group. If NULL, the first group is used.
+#' @param differentialTestingTitle A string for the title of the differential testing results.
+#' @param variable A string indicating the type of variable to analyze. Can be one of "cellcount", "abundance", or "marker".
+#' @param NFSValues A named vector of normalization factor values for visualizations. Used only if variable is "abundance".
+#' @param marker A string specifying the marker to analyze. Used only if variable is "marker".
+#' @param comparisonSplFCref A list of sample groups for fold change reference.
+#' @param FCrefMethod A string specifying the method for calculating fold change. Options are "ratio" or "percIncrease".
+#' @param eps A small value to avoid division by zero when calculating fold change.
+#' @param twogroupTest A string specifying the statistical test for two-group comparisons. Options are "wilcox.test", "t.test", or "permutation.test".
+#' @param moregroupTest A string specifying the statistical test for multi-group comparisons. Options are "kruskal", "ANOVA", "ANOVA.MR", or "friedman".
+#' @param posthocTest A string specifying the post-hoc test to apply. Options are "none", "dunn", or "tukey".
+#' @param p.adjust A string specifying the method for adjusting p-values. Options are "none", "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", or "fdr".
+#' @param paired A logical indicating whether to perform a paired test. Defaults to FALSE.
+#' @param verbose A logical indicating whether to print verbose messages.
+#' @param checkOverwrite A logical indicating whether to prompt for overwriting existing differential testing results.
+#' @param ... Additional arguments passed to other functions.
 #'
-#' Such clusters correspond to cell clusters having abundances statistically different between two biological comparisonSpls.
-#' The statistical test used for the comparisons can be defined by users.
-#' For each cluster, the p-value, log2 fold-change and effect size relative to the reference comparisonSpl are computed.
-#' Statistical comparison can be performed in a paired and unpaired manner.
-#' Computed p-values can be corrected for multiple testing.
+#' @return The updated CYTdata object with differential testing results stored in the `differentialTesting` slot.
+#'         The results include p-values, fold changes, and significance values for each cluster comparison.
 #'
-#' @param CYTdata a CYTdata object
-#' @param comparisonSpl a character value providing the name of the comparisonSpl to be compared
-#' @param referenceSpl a character value providing the name of reference comparisonSpl
-#' @param comparison a character value providing the name of comparison
-#' @param test.statistics a character value providing the type of statistical test to use. Possible values are: 'wilcoxon' or 't-test'
-#' @param p.adjust a character value providing the type of p-value adjustment  to use.
-#' Possible values are: 'none', 'holm', 'hochberg', 'hommel', 'bonferroni', 'BH', 'BY', 'fdr'
-#' By default, no p-value adjustement made
-#' @param paired a boolean value indicating if individuals are paired
+#' @examples
+#' # Example for performing differential testing with cell counts
+#' CYTdata <- runDifferentialTesting(CYTdata,
+#'                                   clustering = "ClusterType",
+#'                                   comparisonSpl = list("GroupA" = c("Sample1", "Sample2"),
+#'                                                        "GroupB" = c("Sample3", "Sample4")),
+#'                                   differentialTestingTitle = "Test1",
+#'                                   variable = "cellcount")
 #'
-#' @return a S4 object of class 'CYTdata'
+#' # Example for performing differential testing with abundance values
+#' CYTdata <- runDifferentialTesting(CYTdata,
+#'                                   clustering = "ClusterType",
+#'                                   comparisonSpl = list("GroupA" = c("Sample1", "Sample2"),
+#'                                                        "GroupB" = c("Sample3", "Sample4")),
+#'                                   differentialTestingTitle = "Test2",
+#'                                   variable = "abundance",
+#'                                   NFSValues = c(Sample1 = 1.2, Sample2 = 1.1, Sample3 = 0.9, Sample4 = 1.0))
 #'
+#' # Example for performing differential testing with a marker
+#' CYTdata <- runDifferentialTesting(CYTdata,
+#'                                   clustering = "ClusterType",
+#'                                   comparisonSpl = list("GroupA" = c("Sample1", "Sample2"),
+#'                                                        "GroupB" = c("Sample3", "Sample4")),
+#'                                   differentialTestingTitle = "Test3",
+#'                                   variable = "marker",
+#'                                   marker = "Marker1")
+#'
+#' @seealso \code{\link{checkorderClustering}} for ordering and checking the clustering data.
 #' @export
-#' @import rstatix
-#'
 
 runDifferentialTesting <- function(CYTdata,
 
@@ -117,7 +162,7 @@ runDifferentialTesting <- function(CYTdata,
     reply <- readline(prompt="\nComparison already performed, do you still want to continue and overwrite (yes or no): ")
     while (!tolower(reply) %in% c("yes", "y", "no", "n")) { reply <- readline(prompt="Reply not standard, please answer yes or no: ") }
     if (tolower(reply) %in% c("no", "n")){ stop("Function stopped, CYTdata object unchanged") }
-    CYTdata@differentialTesting@data = CYTdata@differentialTesting@data %>% filter(title != differentialTestingTitle)
+    CYTdata@differentialTesting@data = CYTdata@differentialTesting@data %>% dplyr::filter(title != differentialTestingTitle)
   }
 
   checkmate::qassert(clustering, "S1")
@@ -256,7 +301,7 @@ runDifferentialTesting <- function(CYTdata,
   df = df %>%
     data.matrix() %>%
     reshape2::melt() %>%
-    rename("clusters" = "Var1", "samples" = "Var2")
+    dplyr::rename("clusters" = "Var1", "samples" = "Var2")
 
   df2 = do.call(rbind, lapply(names(comparisonSpl), function(splName) { data.frame(samples = comparisonSpl[[splName]], idx = 1:length(comparisonSpl[[splName]]), group = splName, ratio = "num") }))
   if (!is.null(comparisonSplFCref)) {
@@ -272,7 +317,7 @@ runDifferentialTesting <- function(CYTdata,
   # plotlist = list()
   # for (i in 1:length(unique(df$clusters))) {
   #   plotlist[[i]] = df %>%
-  #     filter(clusters==unique(df$clusters)[i]) %>%
+  #     dplyr::filter(clusters==unique(df$clusters)[i]) %>%
   #     ggplot(aes(x=group, y=value, fill=group)) +
   #     ggplot2::geom_point(ggplot2::aes(group = group, shape = Study),
   #                           position = ggplot2::position_dodge(0.5), color = "black", size = 5)
@@ -355,22 +400,48 @@ runDifferentialTesting <- function(CYTdata,
 }
 
 
-#' @title Plots of a volcano plot of statistical analysis
+#' @title Volcano Plot for Differential Testing Results
 #'
-#' @description This function aims to visualize the results of a differential abundant analysis using a Volcano plot
-#' In such representation, each in dot corresponds to a pheotpic family and dots are positioned in two dimensional space where the X-axis represents the log2(fold-change) and the Y-axis represents the -log10 of the p-value.
-#' Un horizontal line is displayed accordingly to the p-value threshold and to vertical lines are displayed accordingly to the fold-change threshold.
-#' The metaclusters are plotted and colored according to their color in the metaclustering heatmap
+#' @description
+#' Generates a volcano plot based on the differential testing results from `CYTdata`. The plot visualizes the log2 fold change (log2FC)
+#' between two groups (`g1` and `g2`) and the significance based on p-values or adjusted p-values. The points are color-coded based on
+#' significance or phenotype clusters.
 #'
-#' @param CYTdata a CYTdata object
-#' @param comparison a character value containing the comparison to study
-#' @param thPval a numeric value containing the p-value threshold to use
-#' @param thFC a numeric value containing the fold-change threshold to use
+#' @param CYTdata An object containing the results of differential testing (class: CYTdata).
+#' @param differentialTestingTitle The title of the differential testing result to visualize (string).
+#' @param thPval The p-value threshold for significance (numeric, default is 0.05).
+#' @param thFC The fold change threshold for significance (numeric, default is 2).
+#' @param displayAdjust A logical value indicating whether adjusted p-values should be displayed (default is FALSE).
+#' @param errorNA A logical value specifying whether to stop execution when there are missing adjusted p-values (default is FALSE).
+#' @param phenoColor A logical value indicating whether the points should be color-coded by phenotype clusters (default is TRUE).
+#' @param signifOnly A logical value indicating whether to only plot significant points (default is TRUE).
 #'
+#' @return A ggplot2 object representing the volcano plot.
+#' @details
+#' The function will filter the data based on the given title (`differentialTestingTitle`). It computes the log-transformed fold
+#' change (log2FC) and p-values (`log10Pval`). Points in the volcano plot are color-coded based on significance thresholds
+#' for p-value and fold change.
 #'
-#' @return a ggplot2 object
+#' The plot can show all points, but when `signifOnly` is set to TRUE, only the significant points are shown (colored
+#' based on whether they are up-regulated or down-regulated).
 #'
-#' @export
+#' The plot also includes dashed lines for the thresholds on the x-axis (log2FC) and y-axis (-log10(p-value)).
+#'
+#' @examples
+#' # Example of creating a volcano plot
+#' volcano_plot <- plotVolcano(
+#'   CYTdata = CYTdata,
+#'   differentialTestingTitle = "MyDifferentialTestingResult",
+#'   thPval = 0.05,
+#'   thFC = 2,
+#'   displayAdjust = TRUE,
+#'   phenoColor = TRUE,
+#'   signifOnly = TRUE
+#' )
+#' print(volcano_plot)
+#'
+#' @seealso
+#' \code{\link{CYTdata}}, \code{\link{ggplot2}}, \code{\link{ggrepel}}
 #'
 
 plotVolcano <- function(CYTdata,
@@ -384,7 +455,7 @@ plotVolcano <- function(CYTdata,
   stats = CYTdata@differentialTesting@data
 
   checkmate::qassert(differentialTestingTitle, "S1")
-  stats = stats %>% filter(title == differentialTestingTitle)
+  stats = stats %>% dplyr::filter(title == differentialTestingTitle)
   if (nrow(stats)==0){
     stop("Error : No differential abundant analysis has been performed with ", differentialTestingTitle, " title. Nothing can be vizualized")
   }
@@ -445,8 +516,8 @@ plotVolcano <- function(CYTdata,
     stats$clusters = factor(stats$clusters, levels = lev[lev %in% stats$clusters])
 
     if (signifOnly) {
-      signifStats = stats %>% filter(dir!="ns")
-      nosignifStats = stats %>% filter(dir=="ns")
+      signifStats = stats %>% dplyr::filter(dir!="ns")
+      nosignifStats = stats %>% dplyr::filter(dir=="ns")
       plot <- ggplot2::ggplot() +
         ggplot2::geom_point(data = signifStats,
                             ggplot2::aes_string(x="log2FC", y="log10Pval", fill="clusters"),
@@ -503,23 +574,46 @@ plotVolcano <- function(CYTdata,
 }
 
 
-#' @title Plot pie chart of abundace
-#
-#' @description This function aims to visualize the composition of differents cell subset according to metadata information by plotting pie chart with each part being a metaluster
+#' @title Plot Piechart for Cell Abundance by Clustering
 #'
-#' It is possible to plot the abundance profile of each metacluster within each kinetic family or
-#' plot the mean abundance profile of metaclusters within each kinetic family
+#' @description
+#' Generates a pie chart to visualize the cell abundance across different clusters, samples, and metadata categories.
+#' The pie chart is stratified based on metadata values for X-axis and Y-axis, and the data can be optionally weighted
+#' by a set of custom NFS values.
 #'
-#' @param CYTdata a CYTdata object
-#' @param samples a character vector containing the names of biological samples to use. By default, all samples are used
-#' @param supermetaclusters a character vector containing the supermetaclusters to plot in the pie chart. By default, "all the supermetaclusters are used
-#' @param color.palette color palette if want to change (one color by part, same length than number of metaclusters)
-#' @param Xaxis a string being the metadata used to plot pie charts on the horizontal line. By default, "Timepoint" metadata is selected
-#' @param Yaxis a string being the metadata used to plot pie charts on the vertical line. By default, "Individual" metadata is selected
+#' @param CYTdata An object containing cytometry data (class: CYTdata).
+#' @param clustering The name of the clustering column used for grouping cells in the plot (string).
+#' @param clusters A vector of clusters to include in the plot. If `NULL`, all clusters will be included (default is `NULL`).
+#' @param samples A vector of sample names to include in the plot. If `NULL`, all samples are used (default is `NULL`).
+#' @param XaxisMetadata The metadata variable to be used for the X-axis (string, default is "Timepoint").
+#' @param YaxisMetadata The metadata variable to be used for the Y-axis (string, default is "Individual").
+#' @param NFSValues A named vector of numeric values for scaling cell counts (optional, default is `NULL`).
+#' @param pieSize A logical value indicating whether the size of the pie chart slices should be proportional to the total value (default is `TRUE`).
+#' @param colorBar A string representing the color for the border of the pie chart slices (hexadecimal color, default is "#000000").
 #'
-#' @return a ggplot2 object
+#' @return A ggplot2 object representing the pie chart.
+#' @details
+#' The pie chart is constructed by first calculating the sum of cell counts for each combination of X-axis and Y-axis metadata values.
+#' The chart is faceted by the levels of the X-axis and Y-axis metadata, with each slice representing the abundance of cells in a given group.
+#' If `NFSValues` is provided, the cell counts are weighted by these values. The color of the slices is determined by the clustering of cells.
 #'
-#' @export
+#' If `pieSize` is set to `TRUE`, the size of each pie slice will be proportional to the sum of the cell counts for the group.
+#'
+#' @examples
+#' # Example of creating a pie chart
+#' piechart_plot <- plotPiechart(
+#'   CYTdata = CYTdata,
+#'   clustering = "Cluster1",
+#'   samples = c("Sample1", "Sample2"),
+#'   XaxisMetadata = "Timepoint",
+#'   YaxisMetadata = "Individual",
+#'   pieSize = TRUE,
+#'   colorBar = "#FF5733"
+#' )
+#' print(piechart_plot)
+#'
+#' @seealso
+#' \code{\link{CYTdata}}, \code{\link{ggplot2}}
 #'
 
 plotPiechart <- function(CYTdata,
@@ -625,1161 +719,6 @@ plotPiechart <- function(CYTdata,
                    panel.grid  = ggplot2::element_blank(),
                    aspect.ratio = 1,
                    legend.position = "bottom")
-
-  return(plot)
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#' @title Plots cell cluster abundances using a boxplot representation
-#'
-#' @description This function aims to visualize and compare the cell cluster abundances for each biological condition using boxplot and jitter representations.
-#'
-#' The abundance of a specific cell cluster or a set of cell clusters can be displayed.
-#' The representation can be restricted to a specific set of samples.
-#' Moreover, boxplot can be constructed based on sample meta information.
-#' Statistic can be computed for all comparisons.
-#'
-#' @param CYTdata a CYTdata object
-#' @param population a character vector containing the identifiers of the population to use
-#' @param samples a character vector containing the names of biological samples to use. By default, all samples are used
-#' @param observationMetadata a character value containing the biological condition to use.
-#' The name of the condition must be the one of a metadat condition (column names of CYTdata's metadat slot). By default, metadata "Timepoint" is used
-#' @param Yvalue a character value containing the parameters to use. Possible value are percentage (default) or absolute.
-#' @param group.by a character value containing the biological condition to group boxplot by. If set to NULL (default), simple boxplot is generated
-#' @param test.statistics a character value providing the type of statistical test to use. Possible values are: 'wilcox.test' or 't.test'
-#' @param paired a boolean value indicating if a paired or unpaired comparison should be applied
-#' @param hideNS a boolean value indicating if non-significant p-value must be hidden
-#'
-#' @return a ggplot2 object
-#'
-#' @export
-#'
-
-plotBoxplot <- function(CYTdata,
-                        population,
-                        level = c("clusters", "metaclusters"),
-                        samples = NULL,
-                        observationMetadata = "Timepoint",
-                        groupMetadata = NULL,
-                        pointMetadata = NULL,
-                        Yvalue = c("percentage", "absolute"),
-                        computePval = FALSE,
-                        test.statistics = c("wilcox.test", "t.test"),
-                        paired = FALSE,
-                        hideNS = TRUE) {
-
-  if (class(CYTdata)!="CYTdata") { stop("Error : argument 'CYTdata' a S4 object of class 'CYTdata'.") }
-  else { CYTdata = MakeValid(CYTdata, verbose = TRUE) }
-
-  if (ncol(CYTdata@metadata)==0) {
-    stop("Error : Missing metadata slot for 'CYTdata' argument.")
-  }
-  checkmate::qassert(observationMetadata, "S1")
-  checkmate::qassert(groupMetadata, c("0", "S1"))
-  checkmate::qassert(pointMetadata, c("0", "S1"))
-  if (!observationMetadata %in% colnames(CYTdata@metadata)){
-    stop("Error : 'observationMetadata' argument is not a metadata (ex : 'Timepoint', 'Individual')")
-  }
-  if (!is.null(groupMetadata)){
-    if (!groupMetadata %in% colnames(CYTdata@metadata)){
-      stop("Error : 'groupMetadata' argument is not a metadata (ex : 'Timepoint', 'Individual')")
-    }
-    if (groupMetadata==observationMetadata){
-      stop("Error : Arguments 'observationMetadata' and 'groupMetadata' are the same metadata")
-    }
-  }
-  if (!is.null(pointMetadata)){
-    if (!pointMetadata %in% colnames(CYTdata@metadata)){
-      stop("Error : 'pointMetadata' argument is not a metadata (ex : 'Timepoint', 'Individual')")
-    }
-    if (pointMetadata==observationMetadata){
-      stop("Error : Arguments 'observationMetadata' and 'pointMetadata' are the same metadata")
-    }
-  }
-
-  level = match.arg(level)
-  checkmate::qassert(level, "S1")
-  Yvalue = match.arg(Yvalue)
-  checkmate::qassert(Yvalue, "S1")
-  data = getRelativeAbundance(CYTdata, population, level, samples, Yvalue)
-
-  if (Yvalue == "percentage") { Ylab = "Abundance of population" }
-  else { Ylab = "Absolute count of population" }
-
-  checkmate::qassert(computePval, "B1")
-  test.statistics = match.arg(test.statistics)
-  checkmate::qassert(test.statistics, "S1")
-  checkmate::qassert(paired, "B1")
-  checkmate::qassert(hideNS, "B1")
-  switch(test.statistics,
-         wilcox.test = { test_fct <- rstatix::wilcox_test },
-         t.test = { test_fct <- rstatix::t_test })
-
-  data[[observationMetadata]] = droplevels(data[[observationMetadata]])
-  colnames(data)[colnames(data)==observationMetadata] = "observationMetadata"
-  if (!is.null(groupMetadata)){
-    data[[groupMetadata]] = droplevels(data[[groupMetadata]])
-    colnames(data)[colnames(data)==groupMetadata] = "groupMetadata"
-  }
-  if (!is.null(pointMetadata)){
-    data[[pointMetadata]] = droplevels(data[[pointMetadata]])
-    colnames(data)[colnames(data)==pointMetadata] = "pointMetadata"
-    if (length(unique(data[[pointMetadata]]))>6) {
-      message("Warning : 'pointMetadata' argument's corresponding metadata has more
-            than 6 different values which is greater than the number of point shapes
-            available in ggplot2/geom_point. pointMetadata not taken into account and
-            argument set to NULL.")
-      pointMetadata = NULL
-    }
-  }
-
-  if (!is.null(groupMetadata)){
-
-    plot <- ggplot2::ggplot(data, ggplot2::aes(x = observationMetadata, y = value)) +
-      ggplot2::geom_boxplot(ggplot2::aes(color = groupMetadata),
-                            size=0.1, fatten=1, linewidth=1, outlier.shape=NA, width=0.3,
-                            position=position_dodge(0.5)) +
-      ggplot2::labs(fill = groupMetadata) +
-      ggplot2::guides(color = ggplot2::guide_legend(title = groupMetadata, override.aes = list(size=3, shape=NA)))
-
-    if (computePval) {
-      statGroup = data %>%
-        group_by(observationMetadata) %>%
-        test_fct(value ~ groupMetadata, paired = paired) %>%
-        rstatix::add_xy_position(x = "observationMetadata", dodge = 0.8) %>%
-        rstatix::add_significance("p")
-      #print(statGroup)
-      statGroup = statGroup %>%
-        filter(p.signif != "ns") %>%
-        filter(!is.na(p.signif))
-      plot <- plot + ggpubr::stat_pvalue_manual(data = statGroup,
-                                                label = "p = {p.signif}",
-                                                hide.ns = hideNS, color = "black", size = 5, tip.length = 0)
-    }
-
-    if (!is.null(pointMetadata)){
-      plot <- plot + ggplot2::geom_point(ggplot2::aes(group = groupMetadata, shape = pointMetadata),
-                                         position = ggplot2::position_dodge(0.5), color = "black", size = 5) +
-        ggplot2::scale_shape_manual(values=1:nlevels(data$pointMetadata)) +
-        ggplot2::labs(shape = pointMetadata)
-    } else {
-      plot <- plot + ggplot2::geom_point(ggplot2::aes(group = groupMetadata),
-                                         position = ggplot2::position_dodge(0.5), color = "black", shape = 16, size = 5)
-    }
-  } else {
-    plot <- ggplot2::ggplot(data, ggplot2::aes(x = observationMetadata, y = value, color = observationMetadata)) +
-      ggplot2::geom_boxplot(ggplot2::aes(color = observationMetadata), outlier.shape = NA, linewidth=1, size = 0.2, fatten = 1, width = 0.3, position=position_dodge(0.5)) +
-      ggplot2::guides(color = ggplot2::guide_legend(title = observationMetadata, override.aes = list(size=3, shape=NA))) +
-
-      if (!is.null(pointMetadata)){
-        plot <- plot + ggplot2::geom_point(ggplot2::aes(group = observationMetadata),
-                                           position = ggplot2::position_dodge(0.5), color = "black", size = 5) +
-          ggplot2::labs(shape = pointMetadata)
-      } else {
-        plot <- plot + ggplot2::geom_point(ggplot2::aes(group = observationMetadata),
-                                           position = ggplot2::position_dodge(0.5), color = "black", shape = 16, size = 5)
-      }
-  }
-
-  if (computePval) {
-    statObservation = data %>%
-      test_fct(value ~ observationMetadata, paired = paired) %>%
-      rstatix::add_xy_position(x = "observationMetadata") %>%
-      rstatix::add_significance("p") %>%
-      filter(p.signif != "ns") %>%
-      filter(!is.na(p.signif))
-
-    plot <- plot + ggpubr::stat_pvalue_manual(data = statObservation,
-                                              label = "p = {p.signif}",
-                                              hide.ns=hideNS, color="black", size=5, tip.length=0.02, step.increase=0.05)
-  }
-
-  plot <- plot +
-    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.1))) +
-    ggplot2::labs(title = "Boxplot representation",
-                  subtitle = paste0(level, ": ", paste0(population, collapse = ", "))) +
-    ggplot2::ylab(Ylab) +
-    ggplot2::xlab(observationMetadata) +
-    ggplot2::theme_classic() +
-    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                   plot.subtitle = ggplot2::element_text(hjust = 0.5, face = "italic"),
-                   aspect.ratio = 1,
-                   panel.grid.minor = ggplot2::element_blank(),
-                   panel.grid.major = ggplot2::element_blank(),
-                   legend.position = "right")
-
-  return(plot)
-}
-
-#' @title Plots cell cluster abundances using a boxplot representation
-#'
-#' @description This function aims to visualize and compare the cell cluster abundances for each biological condition using boxplot and jitter representations.
-#'
-#' The abundance of a specific cell cluster or a set of cell clusters can be displayed.
-#' The representation can be restricted to a specific set of samples.
-#' Moreover, boxplot can be constructed based on sample meta information.
-#' Statistic can be computed for all comparisons.
-#'
-#' @param CYTdata a CYTdata object
-#' @param population a character vector containing the identifiers of the population to use
-#' @param samples a character vector containing the names of biological samples to use. By default, all samples are used
-#' @param observationMetadata a character value containing the biological condition to use.
-#' The name of the condition must be the one of a metadat condition (column names of CYTdata's metadat slot). By default, metadata "Timepoint" is used
-#' @param Yvalue a character value containing the parameters to use. Possible value are percentage (default) or absolute.
-#' @param group.by a character value containing the biological condition to group boxplot by. If set to NULL (default), simple boxplot is generated
-#' @param test.statistics a character value providing the type of statistical test to use. Possible values are: 'wilcox.test' or 't.test'
-#' @param paired a boolean value indicating if a paired or unpaired comparison should be applied
-#' @param hideNS a boolean value indicating if non-significant p-value must be hidden
-#'
-#' @return a ggplot2 object
-#'
-#' @export
-#'
-
-plotBoxLinedPlot <- function(CYTdata,
-                             population,
-                             level = c("clusters", "metaclusters"),
-                             samples = NULL,
-                             observationMetadata = "Timepoint",
-                             Yvalue = c("percentage", "absolute"),
-                             computeStats = TRUE,
-                             test.statistics = c("wilcox.test", "t.test"),
-                             paired = FALSE,
-                             hideNS = TRUE) {
-
-  if (class(CYTdata)!="CYTdata") { stop("Error : argument 'CYTdata' a S4 object of class 'CYTdata'.") }
-  else { CYTdata = MakeValid(CYTdata, verbose = TRUE) }
-
-  level = match.arg(level)
-  checkmate::qassert(level, "S1")
-  Yvalue = match.arg(Yvalue)
-  checkmate::qassert(Yvalue, "S1")
-  data = getRelativeAbundance(CYTdata, population, level, samples, Yvalue)
-  if (Yvalue == "percentage") { Ylab = "% abundance of population" }
-  else { Ylab = "absolute abundance of population" }
-
-
-  if (ncol(CYTdata@metadata)==0) {
-    stop("Error : Missing metadata slot for 'CYTdata' argument.")
-  }
-  checkmate::qassert(observationMetadata, "S1")
-  if (!observationMetadata %in% colnames(CYTdata@metadata)){
-    stop("Error : 'observationMetadata' argument is not a metadata (ex : 'Timepoint', 'Individual')")
-  }
-  if (observationMetadata=="Individual"){
-    stop("Error : 'observationMetadata' argument can not be 'Individual' metadata.")
-  }
-  data[[observationMetadata]] = droplevels(data[[observationMetadata]])
-  colnames(data)[colnames(data)==observationMetadata] = "observationMetadata"
-
-  plot <- ggplot2::ggplot(data,
-                          ggplot2::aes(x = "observationMetadata",
-                                       y = "value",
-                                       group = "Individual")) +
-    ggplot2::geom_line(ggplot2::aes(color="Individual")) +
-    ggplot2::geom_point(ggplot2::aes(shape = "Individual", color="Individual")) +
-    ggplot2::geom_boxplot(ggplot2::aes(fill = "observationMetadata"),
-                          outlier.shape = NA, size = 0.2, fatten = 1) +
-    ggplot2::labs(fill = observationMetadata) +
-    ggplot2::labs(group = "Individual") +
-    ggplot2::labs(color = "Individual") +
-    ggplot2::labs(shape = "Individual")
-
-  if (computeStats) {
-    test.statistics = match.arg(test.statistics)
-    checkmate::qassert(test.statistics, "S1")
-    checkmate::qassert(paired, "B1")
-    checkmate::qassert(hideNS, "B1")
-
-    switch(test.statistics,
-           wilcox.test = { test_fct <- rstatix::wilcox_test },
-           t.test = { test_fct <- rstatix::t_test })
-    statObservation = data %>%
-      test_fct(value ~ observationMetadata, paired = paired) %>%
-      rstatix::add_xy_position(x = "observationMetadata") %>%
-      rstatix::add_significance("p") %>%
-      filter(p.signif != "ns")
-
-    plot <- plot +
-      ggpubr::stat_pvalue_manual(data = statObservation,
-                                 label = "p = {p.signif}",
-                                 hide.ns = hideNS,
-                                 color = "black", size = 5, tip.length = 0.02, step.increase = 0.05)
-  }
-
-  plot <- plot +
-    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.1))) +
-    ggplot2::labs(title = "Boxplot representation",
-                  subtitle = paste0(level, ": ", paste0(population, collapse = ", "))) +
-    ggplot2::ylab(Ylab) +
-    ggplot2::xlab(observationMetadata) +
-    ggplot2::theme_classic() +
-    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                   plot.subtitle = ggplot2::element_text(hjust = 0.5, face = "italic"),
-                   aspect.ratio = 1,
-                   panel.grid.minor =  ggplot2::element_blank(),
-                   panel.grid.major =  ggplot2::element_blank(),
-                   legend.position = "right")
-  return(plot)
-}
-
-#' @title Plots cell cluster abundances using a boxplot representation
-#'
-#' @description This function aims to visualize and compare the cell cluster abundances for each biological condition using boxplot and jitter representations.
-#'
-#' The abundance of a specific cell cluster or a set of cell clusters can be displayed.
-#' The representation can be restricted to a specific set of samples.
-#' Moreover, boxplot can be constructed based on sample meta information.
-#' Statistic can be computed for all comparisons.
-#'
-#' @param CYTdata a CYTdata object
-#' @param population a character vector containing the identifiers of the population to use
-#' @param samples a character vector containing the names of biological samples to use. By default, all samples are used
-#' @param observationMetadata a character value containing the biological condition to use.
-#' The name of the condition must be the one of a metadata condition (column names of CYTdata's metadat slot). By default, metadata "Timepoint" is used
-#' @param Yvalue a character value containing the parameters to use. Possible value are percentage (default) or absolute.
-#' @param group.by a character value containing the biological condition to group boxplot by. If set to NULL (default), simple boxplot is generated
-#' @param test.statistics a character value providing the type of statistical test to use. Possible values are: 'wilcox.test' or 't.test'
-#' @param paired a boolean value indicating if a paired or unpaired comparison should be applied
-#' @param hideNS a boolean value indicating if non-significant p-value must be hidden
-#'
-#' @return a ggplot2 object
-#'
-#' @export
-#'
-#'
-plotLineplot2 <- function(CYTdata,
-                          population = NULL,
-                          level = c("clusters", "metaclusters"),
-                          samples = NULL,
-                          observationMetadata = "Timepoint",
-                          colorMetadata = NULL,
-                          Yvalue = c("percentage", "absolute"),
-                          stats = TRUE,
-                          test.statistics = c("wilcox.test", "t.test"),
-                          paired = FALSE,
-                          hideNS = TRUE) {
-
-  if (class(CYTdata)!="CYTdata") { stop("Error : argument 'CYTdata' a S4 object of class 'CYTdata'.") }
-  else { CYTdata = MakeValid(CYTdata, verbose = TRUE) }
-
-  if (ncol(CYTdata@metadata)==0) {
-    stop("Error : Missing metadata slot for 'CYTdata' argument.")
-  }
-  checkmate::qassert(observationMetadata, "S1")
-  checkmate::qassert(colorMetadata, c("0", "S1"))
-  if (!observationMetadata %in% colnames(CYTdata@metadata)){
-    stop("Error : 'observationMetadata' argument is not a metadata (ex : 'Timepoint', 'Individual')")
-  }
-  if (!is.null(colorMetadata)){
-    if (!colorMetadata %in% colnames(CYTdata@metadata)){
-      stop("Error : 'colorMetadata' argument is not a metadata (ex : 'Timepoint', 'Individual')")
-    }
-    if (colorMetadata==observationMetadata){
-      stop("Error : Arguments 'observationMetadata' and 'colorMetadata' are the same metadata")
-    }
-  }
-
-  level = match.arg(level)
-  checkmate::qassert(level, "S1")
-  Yvalue = match.arg(Yvalue)
-  checkmate::qassert(Yvalue, "S1")
-  data = getRelativeAbundance(CYTdata, population, level, samples, Yvalue)
-
-  if (Yvalue == "percentage") { Ylab = "Abundance of population" }
-  else { Ylab = "Absolute count of population" }
-
-  data[[observationMetadata]] = droplevels(data[[observationMetadata]])
-  colnames(data)[colnames(data)==observationMetadata] = "observationMetadata"
-  if (!is.null(colorMetadata)){
-    data[[colorMetadata]] = droplevels(data[[colorMetadata]])
-    colnames(data)[colnames(data)==colorMetadata] = "colorMetadata"
-  }
-
-  if (!is.null(colorMetadata)){
-
-
-    plot <- ggplot2::ggplot(data,
-                            ggplot2::aes(x = observationMetadata, y = value, group=colorMetadata)) +
-      ggplot2::geom_line(size=2) +
-      ggplot2::geom_point(size = 8) +
-      ggplot2::labs(color = colorMetadata,
-                    group = "Individual",
-                    shape = colorMetadata)
-  }
-  else { }
-
-  plot <- plot +
-    ggplot2::labs(title = "Lineplot representation",
-                  subtitle = paste0(level, ": ", paste0(population, collapse = ", "))) +
-    ggplot2::ylab(Ylab) +
-    ggplot2::xlab(observationMetadata) +
-    ggplot2::theme_classic() +
-    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                   plot.subtitle = ggplot2::element_text(hjust = 0.5, face = "italic"),
-                   #aspect.ratio = 1,
-                   text = ggplot2::element_text(size = 35),
-                   axis.title.y = element_text(size = 40, face = "bold"),
-                   axis.title.x = ggplot2::element_blank(),
-                   axis.text.x = ggplot2::element_text(size = 35, face = "bold"),
-                   axis.text.y = ggplot2::element_text(size = 35, face = "bold"),
-                   panel.grid.minor =  ggplot2::element_blank(),
-                   panel.grid.major =  ggplot2::element_blank(),
-                   legend.position = "right")
-  return(plot)
-}
-
-
-plotLineplot <- function(CYTdata,
-                         population = NULL,
-                         level = c("clusters", "metaclusters"),
-                         samples = NULL,
-                         observationMetadata = "Timepoint",
-                         groupMetadata = NULL,
-                         colorMetadata = NULL,
-                         Yvalue = c("percentage", "absolute"),
-                         addJitter = FALSE,
-                         stats = TRUE,
-                         test.statistics = c("wilcox.test", "t.test"),
-                         paired = FALSE,
-                         hideNS = TRUE) {
-
-  if (class(CYTdata)!="CYTdata") { stop("Error : argument 'CYTdata' a S4 object of class 'CYTdata'.") }
-  else { CYTdata = MakeValid(CYTdata, verbose = TRUE) }
-
-  if (ncol(CYTdata@metadata)==0) {
-    stop("Error : Missing metadata slot for 'CYTdata' argument.")
-  }
-  checkmate::qassert(observationMetadata, "S1")
-  checkmate::qassert(groupMetadata, c("0", "S1"))
-  if (!observationMetadata %in% colnames(CYTdata@metadata)){
-    stop("Error : 'observationMetadata' argument is not a metadata (ex : 'Timepoint', 'Individual')")
-  }
-  if (!is.null(groupMetadata)){
-    if (!groupMetadata %in% colnames(CYTdata@metadata)){
-      stop("Error : 'groupMetadata' argument is not a metadata (ex : 'Timepoint', 'Individual')")
-    }
-    if (groupMetadata==observationMetadata){
-      stop("Error : Arguments 'observationMetadata' and 'groupMetadata' are the same metadata")
-    }
-  }
-
-  level = match.arg(level)
-  checkmate::qassert(level, "S1")
-  Yvalue = match.arg(Yvalue)
-  checkmate::qassert(Yvalue, "S1")
-
-  checkmate::qassert(addJitter, "B1")
-
-  data = getRelativeAbundance(CYTdata, population, level, samples, Yvalue)
-
-  if (Yvalue == "percentage") { Ylab = "Abundance of population" }
-  else { Ylab = "Absolute count of population" }
-
-  data[[observationMetadata]] = droplevels(data[[observationMetadata]])
-  colnames(data)[colnames(data)==observationMetadata] = "observationMetadata"
-  if (!is.null(groupMetadata)){
-    data[[groupMetadata]] = droplevels(data[[groupMetadata]])
-    colnames(data)[colnames(data)==groupMetadata] = "groupMetadata"
-  }
-
-  if (!is.null(groupMetadata)){
-
-    data = data %>%
-      dplyr::group_by(observationMetadata, groupMetadata) %>%
-      dplyr::summarize(mean = mean(value, na.rm=TRUE),
-                       sd = sd(value, na.rm=TRUE))
-
-    plot <- ggplot2::ggplot(data,
-                            ggplot2::aes(x = observationMetadata, y = mean,
-                                         group = groupMetadata)) +
-      ggplot2::geom_line(ggplot2::aes(color = groupMetadata), size=2) +
-      ggplot2::geom_point(ggplot2::aes(shape = groupMetadata, color = groupMetadata), size = 8) +
-      ggplot2::geom_errorbar(ggplot2::aes(ymin=mean-sd, ymax=mean+sd, color = groupMetadata),
-                             size = .8, width=.5, position=position_dodge(0)) +
-      ggplot2::labs(color = groupMetadata,
-                    group = groupMetadata,
-                    shape = groupMetadata)
-  }
-  else {
-    data = data %>%
-      dplyr::group_by(observationMetadata) %>%
-      dplyr::summarize(mean = mean(value, na.rm=TRUE),
-                       sd = sd(value, na.rm=TRUE))
-    plot <- ggplot2::ggplot(data,
-                            ggplot2::aes(x = observationMetadata, y = mean, group=1)) +
-      ggplot2::geom_point(size = 3) +
-      ggplot2::geom_path() +
-      ggplot2::geom_errorbar(ggplot2::aes(ymin=mean-sd, ymax=mean+sd),
-                             size = .1, width=.1, position=position_dodge(0))
-  }
-
-  plot <- plot +
-    ggplot2::labs(title = "Lineplot representation",
-                  subtitle = paste0(level, ": ", paste0(population, collapse = ", "))) +
-    ggplot2::ylab(Ylab) +
-    ggplot2::xlab(observationMetadata) +
-    ggplot2::theme_classic() +
-    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                   plot.subtitle = ggplot2::element_text(hjust = 0.5, face = "italic"),
-                   #aspect.ratio = 1,
-                   text = ggplot2::element_text(size = 35),
-                   axis.title.y = element_text(size = 40, face = "bold"),
-                   axis.title.x = ggplot2::element_blank(),
-                   axis.text.x = ggplot2::element_text(size = 35, face = "bold"),
-                   axis.text.y = ggplot2::element_text(size = 35, face = "bold"),
-                   panel.grid.minor =  ggplot2::element_blank(),
-                   panel.grid.major =  ggplot2::element_blank(),
-                   legend.position = "right")
-  return(plot)
-}
-
-
-
-
-
-#' @title Plots a proportional stacked area chart of clusters evolution along the samples
-#'
-#' @description This function aims to visualize a proportional stacked area chart of clusters evolution along the samples
-#'
-#'
-#' @param CYTdata a CYTOF.analysis object
-#' @param samples a character vector containing the names of biological samples to use
-#' @param clusters a character vector containing the names of clusters to use
-#'
-#' @return a ggplot2 object
-#'
-#' @export
-#'
-#'
-
-
-plotStackedBarplot <- function(CYTdata,
-                               population = NULL,
-                               level = c("clusters", "metaclusters"),
-                               samples = NULL,
-                               observationMetadata = "Timepoint",
-                               groupMetadata = NULL,
-                               Yvalue = c("ABrelative", "CCabsolute")) {
-
-  if (class(CYTdata)!="CYTdata") { stop("Error : argument 'CYTdata' a S4 object of class 'CYTdata'.") }
-  else { CYTdata = MakeValid(CYTdata, verbose = TRUE) }
-
-  level = match.arg(level)
-  checkmate::qassert(level, "S1")
-  population = checkorderPopulation(CYTdata, population=population, level=level,
-                                    order=TRUE, checkDuplicates=TRUE)
-  samples = checkorderSamples(CYTdata, samples, order=TRUE, checkDuplicates=TRUE)
-
-  if (ncol(CYTdata@metadata)==0) {
-    stop("Error : Missing metadata slot for 'CYTdata' argument.")
-  }
-  checkmate::qassert(observationMetadata, "S1")
-  checkmate::qassert(groupMetadata, c("0", "S1"))
-  if (!observationMetadata %in% colnames(CYTdata@metadata)){
-    stop("Error : 'observationMetadata' argument is not a metadata (ex : 'Timepoint', 'Individual')")
-  }
-  if (!is.null(groupMetadata)){
-    if (!groupMetadata %in% colnames(CYTdata@metadata)){
-      stop("Error : 'groupMetadata' argument is not a metadata (ex : 'Timepoint', 'Individual')")
-    }
-    if (groupMetadata==observationMetadata){
-      stop("Error : Arguments 'observationMetadata' and 'groupMetadata' are the same metadata")
-    }
-  }
-
-  Yvalue = match.arg(Yvalue)
-  checkmate::qassert(Yvalue, "S1")
-
-  if (level == "clusters"){
-    data = CYTdata@Clustering@cellcount[population, samples, drop=FALSE]
-    palette = CYTdata@Clustering@palette
-    lev = levels(CYTdata@Clustering@clusters)
-  }
-  else {
-    data = CYTdata@Metaclustering@cellcount[population, samples, drop=FALSE]
-    palette = CYTdata@Metaclustering@palette
-    lev = levels(CYTdata@Metaclustering@metaclusters)
-  }
-
-  data = suppressWarnings(reshape::melt(data.matrix(data)))
-  colnames(data) = c("population", "samples", "value")
-  md = CYTdata@metadata
-  md$samples = rownames(md)
-  data = merge(data, md, by = "samples")
-  data[[observationMetadata]] = droplevels(data[[observationMetadata]])
-  colnames(data)[colnames(data)==observationMetadata] = "observationMetadata"
-  if (!is.null(groupMetadata)){
-    data[[groupMetadata]] = droplevels(data[[groupMetadata]])
-    colnames(data)[colnames(data)==groupMetadata] = "groupMetadata"
-  }
-  if (length(unique(data$observationMetadata))==1) {
-    stop("Error : 'samples' argument procides only one level of 'observationMetadata' argument (",
-         unique(data$observationMetadata), "). Impossible to build stacked area plot.")
-  }
-  data$population = factor(data$population, levels = lev)
-
-  if (!is.null(groupMetadata)){
-    data = data %>%
-      dplyr::group_by(population, observationMetadata, groupMetadata) %>%
-      dplyr::summarise(y = sum(value))
-
-    if(Yvalue == "ABrelative") {
-      data = data %>%
-        dplyr::group_by(observationMetadata, groupMetadata) %>%
-        dplyr::mutate(y = y / sum(y))
-    }
-    plot <- ggplot2::ggplot(data %>% arrange(observationMetadata),
-                            ggplot2::aes(fill = population,
-                                         y = y,
-                                         x = groupMetadata))
-
-    if(Yvalue == "ABrelative") {
-      plot <- plot + ggplot2::geom_bar(position="fill", stat="identity", width = 0.75)
-      Ylab = "Abundance (Relative)"
-    }
-    else {
-      plot <- plot + ggplot2::geom_bar(position="stack", stat="identity", width = 0.75)
-      Ylab =  "Absolute counts"
-    }
-
-    plot <- plot + facet_grid(~observationMetadata, switch = "x")
-  }
-  else {
-    data = data %>%
-      dplyr::group_by(population, observationMetadata) %>%
-      dplyr::summarise(y = sum(value))
-    if(Yvalue == "ABrelative") {
-      data = data %>%
-        dplyr::group_by(observationMetadata) %>%
-        dplyr::mutate(y = y / sum(y))
-    }
-    plot <- ggplot2::ggplot(data,
-                            ggplot2::aes(fill = population,
-                                         y = y,
-                                         x = observationMetadata))
-
-    if(Yvalue == "ABrelative") {
-      plot <- plot + ggplot2::geom_bar(position="fill", stat="identity")
-      Ylab = "Abundance (Relative)"
-    }
-    else {
-      plot <- plot + ggplot2::geom_bar(position="stack", stat="identity")
-      Ylab =  "Absolute counts"
-    }
-
-  }
-
-  plot <- plot +
-    ggplot2::scale_fill_manual(values = palette) +
-    ggplot2::labs(title = "Stacked Area representation",
-                  fill = "Population") +
-    ggplot2::ylab(Ylab) +
-    #ggplot2::xlab(observationMetadata) +
-    ggplot2::theme_classic() +
-    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, size=55, face="bold"),
-                   plot.subtitle = ggplot2::element_text(hjust = 0.5, face = "italic"),
-                   panel.grid.minor =  ggplot2::element_blank(),
-                   panel.grid.major =  ggplot2::element_blank(),
-                   text = ggplot2::element_text(size = 35),
-                   axis.title.y = element_text(size = 40, face = "bold"),
-                   axis.title.x = ggplot2::element_blank(),
-                   axis.text.x = ggplot2::element_text(size = 35, face = "bold"),
-                   axis.text.y = ggplot2::element_text(size = 35, face = "bold"),
-                   legend.position = "right")
-  if (!is.null(groupMetadata)){ plot <- plot + ggplot2::theme(strip.placement = "outside",
-                                                              strip.text.x = element_text(size = 40, face = "bold"),
-                                                              strip.background = element_rect(fill = NA, color = "white"),
-                                                              panel.spacing = unit(1.4, "lines")) }
-
-  return(plot)
-}
-
-
-
-#' @title Plots a proportional stacked area chart of clusters evolution along the samples
-#'
-#' @description This function aims to visualize a proportional stacked area chart of clusters evolution along the samples
-#'
-#'
-#' @param CYTdata a CYTOF.analysis object
-#' @param samples a character vector containing the names of biological samples to use
-#' @param clusters a character vector containing the names of clusters to use
-#'
-#' @return a ggplot2 object
-#'
-#' @export
-#'
-
-plotStackedArea <- function(CYTdata,
-                            population = NULL,
-                            level = c("clusters", "metaclusters"),
-                            samples = NULL,
-                            observationMetadata = "Timepoint",
-                            Yvalue = c("ABrelative", "CCabsolute")) {
-
-  if (class(CYTdata)!="CYTdata") { stop("Error : argument 'CYTdata' a S4 object of class 'CYTdata'.") }
-  else { CYTdata = MakeValid(CYTdata, verbose = TRUE) }
-
-  level = match.arg(level)
-  checkmate::qassert(level, "S1")
-  population = checkorderPopulation(CYTdata, population=population, level=level,
-                                    order=TRUE, checkDuplicates=TRUE)
-  samples = checkorderSamples(CYTdata, samples, order=TRUE, checkDuplicates=TRUE)
-
-  if (ncol(CYTdata@metadata)==0) {
-    stop("Error : Missing metadata slot for 'CYTdata' argument.")
-  }
-  checkmate::qassert(observationMetadata, "S1")
-  if (!observationMetadata %in% colnames(CYTdata@metadata)){
-    stop("Error : 'observationMetadata' argument is not a metadata (ex : 'Timepoint', 'Individual')")
-  }
-
-  Yvalue = match.arg(Yvalue)
-  checkmate::qassert(Yvalue, "S1")
-
-  if (level == "clusters"){
-    data = CYTdata@Clustering@cellcount[population, samples, drop=FALSE]
-    palette = CYTdata@Clustering@palette
-    lev = levels(CYTdata@Clustering@clusters)
-  }
-  else {
-    data = CYTdata@Metaclustering@cellcount[population, samples, drop=FALSE]
-    palette = CYTdata@Metaclustering@palette
-    lev = levels(CYTdata@Metaclustering@metaclusters)
-  }
-
-  data = suppressWarnings(reshape::melt(data.matrix(data)))
-  colnames(data) = c("population", "samples", "value")
-  md = CYTdata@metadata
-  md$samples = rownames(md)
-  data = merge(data, md, by = "samples")
-  data[[observationMetadata]] = droplevels(data[[observationMetadata]])
-  colnames(data)[colnames(data)==observationMetadata] = "observationMetadata"
-  if (length(unique(data$observationMetadata))==1) {
-    stop("Error : 'samples' argument procides only one level of 'observationMetadata' argument (",
-         unique(data$observationMetadata), "). Impossible to build stacked area plot.")
-  }
-  data$population = factor(data$population, levels = lev)
-
-  data = data %>%
-    dplyr::group_by(population, observationMetadata) %>%
-    dplyr::summarise(y = sum(value))
-  if(Yvalue == "ABrelative") {
-    data = data %>%
-      dplyr::group_by(observationMetadata) %>%
-      dplyr::mutate(y = y / sum(y))
-    Ylab = "Abundance (Relative)"
-  }
-  else { Ylab =  "Absolute counts" }
-
-  plot <- ggplot2::ggplot(data,
-                          ggplot2::aes(x = observationMetadata,
-                                       y = y)) +
-    ggplot2::geom_area(ggplot2::aes(colour = population,
-                                    group = population,
-                                    fill = population),
-                       alpha=0.6, size=1, colour="white") +
-    ggplot2::scale_fill_manual(values = palette) +
-    ggplot2::labs(title = "Stacked Area representation",
-                  fill = level) +
-    ggplot2::ylab(Ylab) +
-    ggplot2::xlab(observationMetadata) +
-    ggplot2::theme_classic() +
-    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                   plot.subtitle = ggplot2::element_text(hjust = 0.5, face = "italic"),
-                   aspect.ratio = 1,
-                   panel.grid.minor =  ggplot2::element_blank(),
-                   panel.grid.major =  ggplot2::element_blank(),
-                   legend.position = "right")
-  return(plot)
-}
-
-
-
-
-
-
-
-
-#' @title Plots a PCA representation based cell cluster abundances
-#'
-#' @description This function aims to represent a Principal Component Analysis representation based on cell cluster abundances.
-#' In such representation, clusters or samples are positioned based on computed principal components.
-#' The representation can be displayed based on specific principal components.
-#' The representation can be restricted to specific cell clusters and samples. In addition, it is possible to choose the levels displayed, clusters or samples.
-#'
-#' @param CYTdata a CYTdata object
-#' @param levels a character value containing the variable to be displayed. Possible values are: 'both', 'clusters' or 'samples'
-#' @param clusters a character vector containing the identifier of the cluster to use. By default, all clusters are used
-#' @param samples a character vector containing the names of biological samples to use. By default, all samples are used
-#' @param components a numeric vector providing the components to display
-#' @param condition.samples a character vector containing the variable to be studied for the samples. Possible values are: 'condition' or 'timepoint"
-#' @param cor.radius.th a numeric value specifying the radius of the correlation plot radius
-#' @param plot.text a boolean value specifying if adds text directly at the plot
-#'
-#' @return a ggplot2 object
-#'
-#' @export
-#'
-plotPCA <- function(CYTdata,
-                    levels = c("both", "clusters", "samples"),
-                    clusters = NULL,
-                    samples = NULL,
-                    components = c(1, 2),
-                    condition.samples = c("condition", "timepoint"),
-                    cor.radius.th = 0.6,
-                    plot.text = TRUE) {
-
-  levels <- match.arg(levels)
-  condition.samples <- match.arg(condition.samples)
-
-  checkmate::qassert(levels, "S1")
-  checkmate::qassert(clusters, c("0", "S*"))
-  checkmate::qassert(samples, c("0", "S*"))
-  checkmate::qassert(components, "N2")
-  checkmate::qassert(condition.samples, "S1")
-  checkmate::qassert(cor.radius.th, "N1")
-  checkmate::qassert(plot.text, "B1")
-
-  if (levels != "both" && levels != "clusters" && levels != "samples") {
-    stop("The levels name is invalid")
-  }
-
-  circleFun <- function(center = c(0, 0), diameter = 1, npoints = 100) {
-    r <- diameter / 2
-    t <- seq(0, 2 * pi, length.out = npoints)
-    x <- center[1] + r * cos(t)
-    y <- center[2] + r * sin(t)
-    return(data.frame(x = x, y = y))
-  }
-
-  matrix.abundance <- CYTdata@matrix.abundance
-
-  if (!is.null(clusters)) {
-    matrix.abundance <- matrix.abundance[rownames(matrix.abundance) %in% clusters, ]
-  }
-  if (!is.null(samples)) {
-    matrix.abundance <- matrix.abundance[, colnames(matrix.abundance) %in% samples]
-  }
-
-  res.PCA <- FactoMineR::PCA(t(matrix.abundance), graph = FALSE)
-  var.explained <- res.PCA$eig[, 2]
-
-  data.clusters <- data.frame(res.PCA$var$coord[, components])
-  colnames(data.clusters) <- c("x", "y")
-  data.clusters$id <- rownames(matrix.abundance)
-
-  data.variables <- data.frame(res.PCA$ind$coord[, components])
-  colnames(data.variables) <- c("x", "y")
-  data.variables$id <- colnames(matrix.abundance)
-
-  data.variables$x <- scales::rescale(data.variables$x, to = c(-1, 1))
-  data.variables$y <- scales::rescale(data.variables$y, to = c(-1, 1))
-
-  data.variables <- merge(data.variables, CYTdata@metadata, by = "row.names")
-  data.variables$Row.names <- NULL
-
-  circle1 <- circleFun(c(0, 0), 2, npoints = 100)
-  circle2 <- circleFun(c(0, 0), 2 * cor.radius.th, npoints = 100)
-
-  data.clusters <- data.clusters[sqrt(data.clusters$x^2 + data.clusters$y^2) > cor.radius.th, ]
-
-  xlab <- paste0("PCA", components[1], " (", round(var.explained[components[1]], 2), "%)")
-  ylab <- paste0("PCA", components[2], " (", round(var.explained[components[2]], 2), "%)")
-
-  plot <- ggplot2::ggplot()
-
-  if (levels == "clusters" || levels == "both") {
-    plot <- plot +
-      ggplot2::geom_hline(yintercept = 0, linetype = "dashed", size = 0.2) +
-      ggplot2::geom_vline(xintercept = 0, linetype = "dashed", size = 0.2) +
-      ggplot2::geom_path(data = circle1,
-                         ggplot2::aes_string(x = "x", y = "y"),
-                         size = 0.2, color = "gray") +
-      ggplot2::geom_path(data = circle2,
-                         ggplot2::aes_string(x = "x", y = "y"),
-                         size = 0.2, linetype = "dashed", color = "gray") +
-      ggiraph::geom_point_interactive(data = data.clusters,
-                                      ggplot2::aes_string(x = "x", y = "y",
-                                                          tooltip = "id",
-                                                          data_id = "id"),
-                                      shape = 21, size = 2,
-                                      stroke = 0.1, fill = "black", color = "black")
-
-    if (plot.text == TRUE) {
-      plot <- plot +
-        ggrepel::geom_text_repel(data = data.clusters,
-                                 ggplot2::aes_string(x = "x",
-                                                     y = "y",
-                                                     label = "id"),
-                                 size = 3,
-                                 color = "black",
-                                 max.overlaps = Inf,
-                                 min.segment.length = 0,
-                                 segment.color = NA,
-                                 segment.size = 0.1)
-    }
-  }
-
-  if (levels == "samples" || levels == "both") {
-    plot <- plot +
-      ggplot2::geom_hline(yintercept = 0, linetype = "dashed", size = 0.2) +
-      ggplot2::geom_vline(xintercept = 0, linetype = "dashed", size = 0.2) +
-      ggplot2::geom_path(data = circle1,
-                         ggplot2::aes_string(x = "x", y = "y"),
-                         size = 0.2, color = "gray") +
-      ggplot2::geom_path(data = circle2,
-                         ggplot2::aes_string(x = "x", y = "y"),
-                         size = 0.2, linetype = "dashed", color = "gray") +
-      ggiraph::geom_point_interactive(data = data.variables,
-                                      ggplot2::aes_string(x = "x", y = "y",
-                                                          fill = condition.samples,
-                                                          tooltip = "id",
-                                                          data_id = "individual"),
-                                      shape = 21, size = 2,
-                                      stroke = 0.1, color = "black")
-
-    if (plot.text == TRUE) {
-      plot <- plot +
-        ggrepel::geom_text_repel(data = data.variables,
-                                 ggplot2::aes_string(x = "x", y = "y",
-                                                     label = "id"),
-                                 size = 3,
-                                 color = "black",
-                                 max.overlaps = Inf,
-                                 min.segment.length = 0,
-                                 segment.color = NA,
-                                 segment.size = 0.1)
-    }
-  }
-
-  plot <- plot + ggplot2::labs(title = "PCA representation")
-
-  plot <- plot +
-    ggplot2::coord_fixed() +
-    ggplot2::xlab(xlab) +
-    ggplot2::ylab(ylab)
-
-  plot <- plot +
-    ggplot2::theme_bw() +
-    ggplot2::theme(
-      plot.title = ggplot2::element_text(hjust = 0.5),
-      aspect.ratio = 1,
-      axis.text.x = ggplot2::element_blank(),
-      axis.text.y = ggplot2::element_blank(),
-      axis.ticks = ggplot2::element_blank(),
-      panel.background = ggplot2::element_rect(color = NA),
-      panel.grid.minor = ggplot2::element_blank(),
-      panel.grid.major = ggplot2::element_blank())
-
-  return(plot)
-}
-
-
-#' @title Plots a MDS representation based on cell cluster abundances/median expression or sample median expression
-#'
-#' @description This function aims to visualize the similarities between samples or clusters based on their abundances or median expression, using a Multidimensional Scaling representation.
-#' Each dot represents a sample or a cluster and the distances between the dots are proportional to the Euclidean distance between these objects.
-#' The representation can be restricted to specific cell clusters and samples. In addition, it is possible to choose the levels displayed, clusters or samples.
-#'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param matrix a character vector containing the matrix to be studied. Possible values are: 'abundance' or 'expression' (default = expression)
-#' @param levels a character value containing the variable to be displayed. Possible values are: 'metaclusters' or 'samples' (default = metaclusters)
-#' @param markers a character vector containing the names of biological markers to use (if matrix set to 'expression'). By default, all markers are used
-#' @param metaclusters a character vector containing the identifiers of the metaclusters to use. By default, all metaclusters are used. Only if levels set to 'metaclusters'
-#' @param samples a character vector containing the names of biological samples to use. By default, all samples are used
-#' @param color.metadata a character vector containing the metadata variable to color the samples points by (if levels set to 'samples')
-#' @param printPolygon a boolean indicating if hull is plotted around each of the groups made by color.metadata argument (default = TRUE)
-#'
-#' @return a ggplot2 object
-#'
-#' @export
-#'
-
-plotMDS <- function(CYTdata,
-                    matrix = c("expression", "abundance"),
-                    levels = c("samples", "metaclusters"),
-                    markers = NULL,
-                    metaclusters = NULL,
-                    samples = NULL,
-                    color.metadata = NULL,
-                    printPolygon = TRUE) {
-
-  if (class(CYTdata)!="CYTdata") { stop("Error : argument 'CYTdata' a S4 object of class 'CYTdata'.")}
-  matrix = match.arg(matrix)
-  checkmate::qassert(matrix, "S1")
-  levels = match.arg(levels)
-  checkmate::qassert(levels, "S1")
-  checkmate::qassert(metaclusters, c("0", "S+"))
-  checkmate::qassert(samples, c("0", "S+"))
-  checkmate::qassert(color.metadata, c("0", "S1"))
-  checkmate::qassert(printPolygon, "B1")
-
-  if (is.null(metaclusters) && length(CYTdata@Metaclustering@metaclusters)>0) { metaclusters = unique(CYTdata@Metaclustering@metaclusters) }
-  samples = checkorderSamples(CYTdata, samples, order = TRUE, checkDuplicates = TRUE)
-  markers = checkorderMarkers(CYTdata, markers, order = TRUE, checkDuplicates = TRUE)
-  if (is.null(samples)) { samples = unique(CYTdata@samples) }
-  if (is.null(markers)) { markers = cocCYTdata@markers }
-
-  if (matrix == "abundance") {
-    if (length(CYTdata@Metaclustering@metaclusters)==0) { stop("Error in plot.MDS function : 'matrix' arguments set to 'abundance' require
-    non empty 'Metaclustering' slots (from CYTdata object)") }
-    data.matrix = CYTdata@Metaclustering@abundance
-    if (is.null(metaclusters)) { metaclusters = rownames(data.matrix) }
-    if (is.null(samples)) { samples = colnames(data.matrix) }
-    data.matrix = data.matrix[rownames(data.matrix) %in% metaclusters, colnames(data.matrix) %in% samples]  }
-  else {
-    if (levels == "metaclusters") {
-      if (length(CYTdata@Metaclustering@metaclusters)==0) { stop("Error in plot.MDS function : 'levels' arguments set to 'metaclusters' require
-      non empty 'Metaclustering' slots (from CYTdata object)") }
-      if (is.null(metaclusters)) { metaclusters = unique(CYTdata@Metaclustering@metaclusters) }
-      if (is.null(samples)) { samples = unique(CYTdata@samples) }
-      data.matrix = cbind(CYTdata@matrix.expression[, markers],
-                          "SPL" = CYTdata@samples,
-                          "MC" = CYTdata@Metaclustering@metaclusters)
-      data.matrix = subset(data.matrix, (MC %in% metaclusters) & (SPL %in% samples))
-      data.matrix$SPL = NULL
-      data.matrix = plyr::ddply(data.matrix, "MC",
-                                function(x) {
-                                  x$MC = NULL
-                                  apply(x, 2, stats::median)
-                                })
-      rownames(data.matrix) = data.matrix$MC
-      data.matrix$MC = NULL
-    } else {
-      data.matrix = cbind(CYTdata@matrix.expression[, markers], "SPL" = CYTdata@samples)
-      if (length(CYTdata@Metaclustering@metaclusters)==0){
-        if (!is.null(metaclusters)){ message("Warning : Metaclustering slot empty but arguments 'matrix' set to 'expression'
-        and 'levels' set to 'samples'. So given 'metaclusters' argument no taken into account") }
-      } else{
-        if (is.null(metaclusters)) { metaclusters = unique(CYTdata@Metaclustering@metaclusters) }
-        data.matrix = cbind(data.matrix, "MC" = CYTdata@Metaclustering@metaclusters)
-        data.matrix = subset(data.matrix, MC %in% metaclusters)
-        data.matrix$MC = NULL
-      }
-      data.matrix = subset(data.matrix, SPL %in% samples)
-      data.matrix = plyr::ddply(data.matrix, "SPL",
-                                function(x) {
-                                  x$SPL = NULL
-                                  apply(x, 2, stats::median)
-                                })
-      rownames(data.matrix) = data.matrix$SPL
-      data.matrix$SPL = NULL
-      data.matrix = t(data.matrix)
-    }
-  }
-
-  plot <- ggplot2::ggplot()
-
-  if (levels == "metaclusters") {
-    colors.metaclusters = CYTdata@Metaclustering@heatmap.object$metaclusters.colors
-
-    fit1 = data.matrix %>% stats::dist() %>% MASS::isoMDS(k = 2, trace = FALSE)
-    x1 = fit1$points[, 1]
-    y1 = fit1$points[, 2]
-    min.lim = min(min(x1), min(y1)) * 1.1
-    max.lim = max(max(x1), max(y1)) * 1.1
-
-    proj.metaclusters = data.frame(x = x1, y = y1)
-    proj.metaclusters$MC = rownames(data.matrix)
-
-    plot <- plot + ggplot2::geom_point(data = proj.metaclusters,
-                                       ggplot2::aes_string(x = "x", y = "y", col = "MC"), size = 1) +
-      ggplot2::labs(title = "Multidimensional Scaling",
-                    subtitle = paste0("Kruskal's stress = ", round(fit1$stress, 2))) +
-      ggplot2::geom_hline(yintercept = (min.lim + max.lim) / 2, linetype = "dashed") +
-      ggplot2::geom_vline(xintercept = (min.lim + max.lim) / 2, linetype = "dashed") +
-      ggrepel::geom_text_repel(data = proj.metaclusters,
-                               ggplot2::aes_string(x = "x", y = "y",
-                                                   label = "MC", color = "MC"),
-                               size = 3, force = 3) +
-      ggplot2::scale_color_manual(values = colors.metaclusters)
-  }
-  else {
-
-    if (!is.null(color.metadata)){
-      if (!color.metadata %in% colnames(CYTdata@metadata)){ stop("Error : 'color.metadata' argument
-                                                                  is not a biological condition present in metadata (",
-                                                                 paste0(colnames(CYTdata@metadata), collapse=","), ")") }
-    } else { color.metadata = "samples" }
-
-    fit2 = t(data.matrix) %>% stats::dist() %>% MASS::isoMDS(k = 2, trace = FALSE)
-    x2 = fit2$points[, 1]
-    y2 = fit2$points[, 2]
-    min.lim = min(min(x2), min(y2)) * 1.1
-    max.lim = max(max(x2), max(y2)) * 1.1
-
-    proj.samples = data.frame(x = x2, y = y2)
-    proj.samples$samples = colnames(data.matrix)
-
-    md = CYTdata@metadata
-    md$samples = rownames(md)
-    proj.samples = merge(proj.samples, md, by = "samples")
-
-    hull.data = c()
-    for (grp in unique(proj.samples[[color.metadata]])){
-      proj.grp = proj.samples[proj.samples[[color.metadata]] == grp,]
-      hull.coord = grDevices::chull(proj.grp[,c("x","y")])
-      hull.grp = proj.grp[hull.coord,]
-      hull.data = rbind(hull.data, hull.grp)
-    }
-    plot <- plot +
-      ggplot2::geom_point(data = proj.samples,
-                          ggplot2::aes_string(x = "x", y = "y",
-                                              col = color.metadata), size = 1) +
-      ggplot2::geom_polygon(data = hull.data,
-                            ggplot2::aes_string(x = "x", y = "y",
-                                                fill = color.metadata,
-                                                group = color.metadata), alpha=0.30) +
-      ggplot2::labs(title = "Multidimensional Scaling",
-                    subtitle = paste0("Kruskal's stress = ", round(fit2$stress, 2))) +
-      ggplot2::geom_hline(yintercept = (min.lim + max.lim) / 2, linetype = "dashed") +
-      ggplot2::geom_vline(xintercept = (min.lim + max.lim) / 2, linetype = "dashed") +
-      ggrepel::geom_text_repel(data = proj.samples,
-                               ggplot2::aes_string(x = "x", y = "y",
-                                                   label = "samples", col = color.metadata),
-                               size = 3, force = 3)
-  }
-
-  plot <- plot +
-    ggplot2::coord_fixed() +
-    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                   plot.subtitle = ggplot2::element_text(hjust = 0.5, face = "italic"),
-                   aspect.ratio = 1,
-                   axis.title.x = ggplot2::element_blank(),
-                   axis.title.y = ggplot2::element_blank(),
-                   axis.text.x = ggplot2::element_blank(),
-                   axis.text.y = ggplot2::element_blank(),
-                   axis.ticks = ggplot2::element_blank(),
-                   panel.background = ggplot2::element_blank(),
-                   panel.border = ggplot2::element_rect(fill = NA),
-                   panel.grid.minor = ggplot2::element_blank(),
-                   panel.grid.major = ggplot2::element_blank())
 
   return(plot)
 }

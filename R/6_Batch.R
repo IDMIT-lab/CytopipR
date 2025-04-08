@@ -1,24 +1,44 @@
-#' @title function for the cyCombine batch correction workflow.
+#' @title Perform Batch Correction on CYTdata Object
 #'
-#' @description Compute the batch correction on the data using the ComBat algorithm.
-#'  Define a covariate, either as a character vector or name of tibble column.
-#'  The covariate should preferable be the cell condition types but can be any column that infers heterogeneity in the data.
-#'  The function assumes that the batch information is in the "batch" column and the data contains a "sample" column with sample information.
+#' @description
+#' This function applies batch correction to a `CYTdata` object, using the specified batch and covariate metadata. The batch correction is performed by utilizing the `cyCombine::batch_correct` function, and it can handle multiple types of normalizations and tie-breaking methods. The function also allows for the inclusion of optional clustering and marker information.
 #'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param batchMetadata a character vector containing the names of metadata associated to batch acquisition (name of a CYTdata's metadata dataframe columns)
-#' @param markers a character vector containing the names of biological markers to correct. By default, all Marker are corrected
-#' @param normMethod a character being the normalization method. Should be either 'rank', 'scale' or 'qnorm'. Default: 'scale'. "rank" is recommended when combining data with heavy batch effects
-#' @param tiesMethod a character being the method to handle ties, when using rank. Default: 'average'
-#' @param seed a numeric being the seed to use when creating the SOM.
-#' @param xdim a numeric being the x-dimension size of the SOM.
-#' @param ydim a numeric being the y-dimension size of the SOM.
-#' @param rlen a numeric being the number of times the data is presented to the SOM network. Consider a larger value, if results are not convincing (e.g. 100)
-#' @param covarMetadata a character being the covariate ComBat should use. Must be the name of a specific metadata (name of a CYTdata's metadata dataframe columns)
-#' @param parametric Default: TRUE. If TRUE, the parametric version of ComBat is used. If FALSE, the non-parametric version is used.
+#' @param CYTdata A CYTdata object containing the data to be batch-corrected.
+#' @param batchMetadata A string specifying the name of the column in `sampleMetadata` for batch information.
+#' @param covarMetadata An optional string specifying the name of the column in `sampleMetadata` for covariate information.
+#' @param samples A character vector of sample identifiers to subset the data for batch correction.
+#' @param clustering A string specifying the name of the column containing the clustering information (optional).
+#' @param clusters A vector of clusters to consider for batch correction (optional).
+#' @param markers A character vector of marker names for which the batch correction is applied.
+#' @param normMethod A string specifying the normalization method. Options are `"scale"`, `"rank"`, and `"qnorm"`. Default is `"scale"`.
+#' @param tiesMethod A string specifying the method for handling tied ranks. Options are `"average"`, `"first"`, `"last"`, `"random"`, `"max"`, and `"min"`. Default is `"average"`.
+#' @param seed A numeric value for the random seed, to ensure reproducibility of the batch correction process. Default is `92`.
+#' @param xdim The number of dimensions for the output (x-axis).
+#' @param ydim The number of dimensions for the output (y-axis).
+#' @param rlen The number of iterations for the batch correction.
+#' @param parametric A logical indicating whether to use parametric methods for batch correction. Default is `TRUE`.
 #'
-#' @return a S4 object of class 'CYTdata'
+#' @return A CYTdata object with the batch-corrected data.
 #'
+#' @details
+#' This function performs batch correction on the `CYTdata` object using the specified batch and optional covariate metadata. The correction method can be customized using the `normMethod` and `tiesMethod` parameters. The function also supports subsetting the data to specific samples or clusters, and the corrected expression data is returned in the CYTdata object. The `cyCombine::batch_correct` function is used for the core batch correction process.
+#'
+#' @examples
+#' # Example 1: Perform batch correction using the "batch" metadata
+#' CYTdata_corrected <- runcyCombine(CYTdata = CYTdata, batchMetadata = "batch", markers = c("marker1", "marker2"))
+#'
+#' # Example 2: Perform batch correction with parametric method and custom seed
+#' CYTdata_corrected <- runcyCombine(CYTdata = CYTdata, batchMetadata = "batch", markers = c("marker1", "marker2"), seed = 100)
+#'
+#' # Example 3: Perform batch correction for specific samples and clusters
+#' CYTdata_corrected <- runcyCombine(CYTdata = CYTdata, batchMetadata = "batch", samples = c("sample1", "sample2"), clustering = "cluster", clusters = c("cluster1", "cluster2"))
+#'
+#' @seealso
+#' \code{\link{batch_correct}} from the \pkg{cyCombine} package for batch correction functionality.
+#'
+#' @import checkmate
+#' @import cyCombine
+#' @import dplyr
 #' @export
 
 runcyCombine <- function(CYTdata,

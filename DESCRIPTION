@@ -1,0 +1,16 @@
+Package: CytopipR
+Type: Package
+Title: R Package to design cytometry data analysis pipeline
+Version: 1.0.0
+Author: Paul Mazet
+Maintainer: PlMazet <pl.mazet81@gmail.com>
+Description: MThis R package provides comprehensive tools for importing, cleaning, transforming, and analyzing flow cytometry (FC) data. It includes functionalities such as :
+    Import, cleaning, transformation of data from FCS files
+    Normalisation across experiment batches, clustering, dimensionality reduction
+    Differential analysis to identify significant cellular populations and markers
+License: No license
+Encoding: UTF-8
+LazyData: true
+URL: https://github.com/IDMIT-lab/CytopipR
+BugReports: https://github.com/IDMIT-lab/CytopipR/issues
+RoxygenNote: 7.2.3

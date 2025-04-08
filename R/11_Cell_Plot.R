@@ -1,27 +1,66 @@
-#' @title Vizualize data in an embedded space after computing dimensionality reduction algorithm
+#' @title Plot Cells in 2D with Various Colorings
 #'
-#' @description This function aims to visualize cells in the embedded space, for given analysis.
-#' This representation can be used on a CYTdata object for which a embedded space have been computed
+#' @description
+#' This function creates a 2D plot of cells from cytometry data. It supports visualization of the data in multiple ways, including dimensionality reduction (e.g., PCA or t-SNE), marker expression comparisons, clustering results, density plots, and metadata coloring. The function also allows for downsampling and various customization options such as linear regression plots.
 #'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param samples a character vector containing the names of biological samples to use
-#' #' @title Vizualize data in an embedded space after computing dimensionnality reduction algorithm
+#' @param CYTdata An object of class \code{CYTdata} containing cytometry data.
+#' @param expression A character string specifying the type of expression data to plot. Options are "DimRed" for dimensionality reduction or "markers" for specific marker expressions.
+#' @param DimRed A string specifying the name of the dimensionality reduction method (e.g., PCA, t-SNE). Used if \code{expression = "DimRed"}.
+#' @param coupleMarkers A vector of two marker names to compare. Used if \code{expression = "markers"}.
+#' @param colorBy A character string specifying how to color the plot. Options are "clustering", "marker", "density", "metadata", or "none".
+#' @param clustering A string specifying the clustering method (used if \code{colorBy = "clustering"}).
+#' @param clusters A vector of cluster names or indices to include in the plot (used if \code{colorBy = "clustering"}).
+#' @param printClustering A logical value indicating whether to print the centroids of each cluster on the plot (used if \code{colorBy = "clustering"}).
+#' @param marker A string specifying the marker to use for coloring the plot (used if \code{colorBy = "marker"}).
+#' @param markerPalette A vector of colors to be used for marker expression coloring (used if \code{colorBy = "marker"}).
+#' @param densityPalette A vector of colors for density plot coloring (used if \code{colorBy = "density"}).
+#' @param metadata A string specifying the metadata column name to use for coloring the plot (used if \code{colorBy = "metadata"}).
+#' @param samples A vector of sample IDs to include in the plot. Optional.
+#' @param filteringMethod A string specifying the filtering method to apply. Options are "remove" or "color".
+#' @param filteringColor The color to use for points that are filtered out (used if \code{filteringMethod = "color"}).
+#' @param noneColor The color to use for the plot when no coloring is applied (used if \code{colorBy = "none"}).
+#' @param percentDownsampling A numeric value between 0 and 1 to downsample the data by a given percentage.
+#' @param bounds A vector of two numeric values representing the quantile bounds for marker expression (used if \code{colorBy = "marker"}).
+#' @param plotLinearRegression A logical value indicating whether to plot a linear regression line (used if \code{expression = "markers"}).
+#' @param ylim The y-axis limits for the plot.
+#' @param xlim The x-axis limits for the plot.
 #'
-#' @description This function aims to visualize cells in the embedded space, for given analysis.
-#' This representation can be used on a CYTdata object for which a embedded space have been computed
+#' @return A \code{ggplot} object representing the 2D plot of cells.
 #'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param samples a character vector containing the names of biological samples to use
+#' @details
+#' This function provides several ways to visualize the relationship between cells and different features:
+#' - **DimRed**: Displays a dimensionality reduction (e.g., PCA, t-SNE) of the cell data.
+#' - **markers**: Plots the expression of two markers and can color by a selected feature (clustering, metadata, etc.).
+#' - **colorBy options**:
+#'   - **"clustering"**: Colors the points by cluster label, and optionally adds centroids for each cluster.
+#'   - **"marker"**: Colors the points based on marker expression, with optional quantile clipping.
+#'   - **"density"**: Colors the points based on cell density.
+#'   - **"metadata"**: Colors the points based on metadata values.
+#'   - **"none"**: Displays the data with no color applied.
 #'
-#' @return a ggplot2 object
+#' Users can customize the appearance of the plot, downsample the data for better performance, and apply different filtering methods to exclude points.
+#'
+#' @examples
+#' # Example usage for DimRed expression with clustering coloring:
+#' plotCells(CYTdata, expression = "DimRed", DimRed = "PCA1", colorBy = "clustering", clustering = "kmeans")
+#'
+#' # Example usage for marker expression comparison with density coloring:
+#' plotCells(CYTdata, expression = "markers", coupleMarkers = c("CD4", "CD8"), colorBy = "density")
+#'
+#' # Example usage for marker expression with custom color palette:
+#' plotCells(CYTdata, expression = "markers", coupleMarkers = c("CD4", "CD8"), colorBy = "marker", markerPalette = c("blue", "red"))
+#'
+#' @import ggplot2
+#' @import checkmate
+#' @import ggnewscale
+#' @import ggpointdensity
+#' @importFrom grDevices colorRampPalette
+#' @importFrom RColorBrewer brewer.pal
+#' @importFrom viridis scale_color_viridis
+#' @import dplyr
+#' @import ggrepel
 #'
 #' @export
-#'
-#'
-#' @return a ggplot2 object
-#'
-#' @export
-#'
 
 plotCells <- function(CYTdata,
 
@@ -113,7 +152,6 @@ plotCells <- function(CYTdata,
       }
     }
   }
-
 
   data = data[subIdx,]
 
@@ -208,7 +246,7 @@ plotCells <- function(CYTdata,
                                               y = labs[2],
                                               color = "metadata"), size = 0.001) +
       ggplot2::scale_color_manual(values = CYTdata@sampleData@metadataPalette[[metadata]]) +
-      ggplot2::labs(color = metadata, title = paste0(title, "with coloration by metadata (", metadata, ").")) +
+      ggplot2::labs(color = metadata, title = paste0(title, " with coloration by metadata (", metadata, ").")) +
       ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(alpha = 1, size = 2), ncol = 1))
 
   } else {

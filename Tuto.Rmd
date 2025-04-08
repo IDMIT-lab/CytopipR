@@ -1,0 +1,371 @@
+---
+title: "How CytopipR works"
+author: "Paul Mazet"
+date: ""
+output: html_document
+---
+
+# Data Import
+
+```{r}
+library(tidyverse) # str_subset, ddply, dplyr::select, %>% 
+install.packages("checkmate")
+library(checkmate)
+```
+
+## FCS files
+
+```{r, fig.heght = 18}
+files = "dataFCS/" %>% 
+  list.files(pattern = "fcs", full.names = TRUE)
+
+metadata <- data.frame(Individual = c("A", "B"), Timepoint = "T0")
+rownames(metadata) <- gsub(pattern = ".fcs", replacement = "", x = basename(files))
+
+channelsInventory = checkFCS_getChannels(files, metadata)
+```
+
+
+
+```{r}
+CYTdata1@cellData@cellExprs
+CYTdata1@sampleData@cellSample
+
+merge(CYTdata1@sampleData@cellSample, CYTdata1@cellData@cellExprs, by = "row.names")
+```
+
+
+
+
+```{r, fig.heght = 18}
+channels = c(channelsInventory$completeChannels, channelsInventory$partialChannels)
+print(channels)
+
+CYTdata1 = createCYTdata(files = files, data = NULL, format = "fcs", channels = channelsInventory$completeChannels, Ndownsampling = 1000)
+
+CYTdata1 = importsampleMetadata(CYTdata1, sampleMetadata_df = metadata, optionnalPalette = NULL, checkOverwrite = TRUE)
+
+CYTdata1@sampleData
+
+showPalettes(CYTdata1, type = "metadata", metadata = "Individual")
+CYTdata1 = changePalette(CYTdata1,  type = "metadata", metadata = "Individual", autoColorRainbow = F, homemadePalette = c("A" = "green", "B" = "blue"))
+CYTdata1@sampleData@metadataPalette
+
+merge(CYTdata1@sampleData@cellSample, CYTdata1@cellData@cellExprs, by = "row.names") %>% merge(CYTdata1@sampleData@sampleMetadata %>% rownames_to_column("SampleID"), by = "SampleID")
+```
+
+## Summarized experiment
+
+```{r}
+
+#BiocManager::install("HDCytoData")
+Krieg_Anti_PD_1_SE_data = HDCytoData::Krieg_Anti_PD_1_SE()
+
+data = Krieg_Anti_PD_1_SE_data@assays@data[[1]] %>% as.data.frame() %>% dplyr::select(-matches("Di"))  %>% dplyr::select(-c("Dead")) %>% dplyr::select(-matches("DNA"))
+
+metadata = Krieg_Anti_PD_1_SE_data@metadata$experiment_info %>% 
+  mutate("Individual" = paste("Indiv", 1:20, sep=""), 
+         "Timepoint" = "Prior") %>% 
+  dplyr::rename("Group" = "group_id", "Batch" = "batch_id") %>%
+  column_to_rownames("sample_id")
+
+data = rowData(Krieg_Anti_PD_1_SE_data) %>% as.data.frame() %>% dplyr::rename("SampleID" = "sample_id") %>%
+  group_by(SampleID) %>%
+  mutate(CellID = paste("Cell", row_number(), sep="")) %>%
+  ungroup() %>%
+  dplyr::select(c("CellID", "SampleID")) %>% 
+  cbind.data.frame(data) %>% 
+  mutate(SampleID = factor(SampleID, levels = rownames(metadata)))
+
+CYTdata2 = createCYTdata(files = NULL, data = data, format = "data.frame", channels = NULL, Ndownsampling = 5000)
+
+CYTdata2 = CYTdata2 %>%
+  renameMarkers(from = colnames(CYTdata2@cellData@cellExprs), to = colnames(CYTdata2@cellData@cellExprs) %>% str_replace("-", "")) %>%
+  renameMarkers(cellSlot = "cellExprs", removeConjugate = T, sepConjugate = "_") %>%
+  renameMarkers(cellSlot = "cellAdditionalexprs", removeConjugate = T, sepConjugate = "_") %>%
+  transformCYTdata(markers = NULL, mode = "arcsinh", cellSlot = "cellExprs") %>%
+  transformCYTdata(markers = NULL, mode = "arcsinh", cellSlot = "cellAdditionalexprs")
+
+CYTdata2@sampleData@cellSample$SampleID %>% levels()
+metadata
+CYTdata2 = importsampleMetadata(CYTdata2, sampleMetadata_df = metadata[levels(CYTdata2@sampleData@cellSample$SampleID),], optionnalPalette = NULL, checkOverwrite = FALSE)
+```
+
+
+```{r}
+CYTdata2@sampleData@sampleMetadata
+showPalettes(CYTdata2, type = "metadata", metadata = "Individual")
+```
+
+
+# Dimensionnality reduction & Batch
+
+```{r}
+lineageMarkers = colnames(CYTdata2@cellData@cellExprs)[!grepl("BC", colnames(CYTdata2@cellData@cellExprs))]
+```
+
+```{r, fig.height = 14, fig.width=18}
+CYTdata2 = runDimRed(CYTdata2,
+                    name = "UMAP_1stTry",
+                    markers = lineageMarkers,
+                    seed = 92, type = "UMAP", init = "laplacian", learning_rate = 0.5, n_epochs = 400,
+                    n_components = 2, metric = "euclidean", scale = FALSE, n_neighbors = 20, min_dist = 0.01,
+                    n_sgd_threads = 30, n_threads = 30, verbose = TRUE, checkOverwrite=FALSE)
+
+```
+
+```{r}
+plotCells(CYTdata2,
+           expression = "DimRed", DimRed = "UMAP_1stTry",
+           percentDownsampling = 0.75,
+           colorBy = "metadata", metadata = "Batch")
+plotCells(CYTdata2,
+           expression = "markers", coupleMarkers = c("CD45", "CD3"),
+           percentDownsampling = 0.75,
+           colorBy = "metadata", metadata = "Batch")
+
+
+
+CYTdata2_corr = runcyCombine(CYTdata2, markers = lineageMarkers,
+                             batchMetadata = "Batch", covarMetadata = "Group",
+                             normMethod = "scale", tiesMethod = "average", seed = 92,
+                             xdim = 7, ydim = 7, rlen = 50, parametric = TRUE)
+
+CYTdata2_corr = runDimRed(CYTdata2_corr,
+                    name = "UMAP_1stTry",
+                    markers = lineageMarkers,
+                    seed = 92, type = "UMAP", init = "laplacian", learning_rate = 0.5, n_epochs = 400,
+                    n_components = 2, metric = "euclidean", scale = FALSE, n_neighbors = 20, min_dist = 0.01,
+                    n_sgd_threads = 30, n_threads = 30, verbose = TRUE, checkOverwrite=FALSE)
+
+plotCells(CYTdata2_corr,
+           expression = "DimRed", DimRed = "UMAP_1stTry",
+           percentDownsampling = 0.75,
+           colorBy = "metadata", metadata = "Batch")
+plotCells(CYTdata2_corr,
+           expression = "markers", coupleMarkers = c("CD45", "CD3"),
+           percentDownsampling = 0.75,
+           colorBy = "metadata", metadata = "Batch")
+
+```
+
+# Clustering
+
+```{r, fig.height = 20, fig.width=26}
+CYTdata2 = runClustering(CYTdata2,
+                         name = "FlowSOM_1stTry",
+                         clusterWith = "markers", markers = lineageMarkers,
+                         clusterBy = "cell",
+                         typeScaling = "center_reduced",
+                         type = "FlowSOM", 
+                        xdim = 8, ydim = 8, rlen = 50, nClus = 20, seed = 42, checkOverwrite=FALSE)
+CYTdata2$opts
+CYTdata2 = CYTdata2$CYTdata
+
+CYTdata2@clusteringData@cellClustering
+
+merge(CYTdata2@sampleData@cellSample, CYTdata2@cellData@cellExprs, by = "row.names") %>% 
+  column_to_rownames("Row.names") %>%  
+  merge(CYTdata2@clusteringData@cellClustering, by = "row.names") %>%
+  column_to_rownames("Row.names") %>%  
+  merge(CYTdata2@sampleData@sampleMetadata %>% rownames_to_column("SampleID"), by = "SampleID")
+
+showPalettes(CYTdata2,type = "clustering", clustering = "FlowSOM_1stTry_FlowSOM_metaclusters")
+
+checkgetMetaclutseringMembership(CYTdata = CYTdata2, clustering = "FlowSOM_1stTry_FlowSOM_SOMclusters",  metaclustering = "FlowSOM_1stTry_FlowSOM_metaclusters") %>% arrange(FlowSOM_1stTry_FlowSOM_metaclusters)
+```
+
+
+```{r, fig.height = 20, fig.width=26}
+df = checkgetMetaclutseringMembership(CYTdata = CYTdata2, clustering = "FlowSOM_1stTry_FlowSOM_SOMclusters",  metaclustering = "FlowSOM_1stTry_FlowSOM_metaclusters") %>%
+  column_to_rownames("FlowSOM_1stTry_FlowSOM_SOMclusters")
+
+data = CYTdata2 %>%
+  computeMSI(computeWith = "markers", markers = lineageMarkers, clustering = "FlowSOM_1stTry_FlowSOM_SOMclusters", typeScaling = "none") %>% t()
+
+png("HM FlowSOM_1stTry, no scaling.png", width = 4000, height = 1200)
+ComplexHeatmap::Heatmap(data, cluster_column_slices = F, column_names_rot = -75, column_title_rot = 75,
+                        column_split = df[colnames(data), "FlowSOM_1stTry_FlowSOM_metaclusters", drop=FALSE],
+                        top_annotation = ComplexHeatmap::HeatmapAnnotation(df = df, col = CYTdata2@clusteringData@clusteringPalette))
+dev.off()
+
+data = CYTdata2 %>%
+  computeMSI(computeWith = "markers", markers = lineageMarkers, clustering = "FlowSOM_1stTry_FlowSOM_SOMclusters", typeScaling = "rescale_min_max") %>% t()
+
+png("HM FlowSOM_1stTry, minmax scaling.png", width = 4000, height = 1200)
+ComplexHeatmap::Heatmap(data, cluster_column_slices = F, column_names_rot = -75, column_title_rot = 75,
+                        column_split = df[colnames(data), "FlowSOM_1stTry_FlowSOM_metaclusters", drop=FALSE],
+                        top_annotation = ComplexHeatmap::HeatmapAnnotation(df = df, col = CYTdata2@clusteringData@clusteringPalette))
+dev.off()
+
+plotCells(CYTdata2,
+           expression = "DimRed", DimRed = "UMAP_1stTry",
+           percentDownsampling = 0.75,
+           colorBy = "clustering", clustering = "FlowSOM_1stTry_FlowSOM_metaclusters")
+plotCells(CYTdata2,
+           expression = "markers", coupleMarkers = c("CD45", "CD3"),
+           percentDownsampling = 0.75,
+           colorBy = "clustering", clustering = "FlowSOM_1stTry_FlowSOM_metaclusters")
+
+```
+
+```{r, fig.height = 20, fig.width=26}
+CYTdata2 = runClustering(CYTdata2,
+                         name = "SOM_1stTry",
+                         clusterWith = "markers", markers = lineageMarkers,
+                         clusterBy = "cell",
+                         typeScaling = "center_reduced",
+                         type = "SOM", grid = kohonen::somgrid(8,8), rlen = 50, mode="pbatch", 
+                         seed = 42, checkOverwrite=FALSE)
+CYTdata2 = CYTdata2$CYTdata
+
+CYTdata2 = runClustering(CYTdata2,
+                         name = "SOM_1stTry_HCSubsets",
+                         clusterWith = "markers", markers = lineageMarkers,
+                         clusterBy = "clustering", clustering = "SOM_1stTry",
+                         typeScaling = "center_reduced", addPrefix = "HC_Subsets", type = "Hierarchical", N_Hierarchical = 20,
+                         checkOverwrite = FALSE, seed = 42)
+
+png("HM SOM_1stTry_HCSubsets.png", width = 4000, height = 1200)
+CYTdata2$opts$HM
+dev.off()
+
+CYTdata2 = CYTdata2$CYTdata
+
+df = checkgetMetaclutseringMembership(CYTdata = CYTdata2, clustering = "SOM_1stTry",  metaclustering = "SOM_1stTry_HCSubsets") %>%
+  column_to_rownames("SOM_1stTry")
+
+data = CYTdata2 %>%
+  computeMSI(computeWith = "markers", markers = lineageMarkers, clustering = "SOM_1stTry", typeScaling = "none") %>% t()
+
+png("HM SOM_1stTry, no scaling.png", width = 4000, height = 1200)
+ComplexHeatmap::Heatmap(data, cluster_column_slices = F, column_names_rot = -75, column_title_rot = 75,
+                        column_split = df[colnames(data), "SOM_1stTry_HCSubsets", drop=FALSE],
+                        top_annotation = ComplexHeatmap::HeatmapAnnotation(df = df, col = CYTdata2@clusteringData@clusteringPalette))
+dev.off()
+
+data = CYTdata2 %>%
+  computeMSI(computeWith = "markers", markers = lineageMarkers, clustering = "SOM_1stTry", typeScaling = "rescale_min_max") %>% t()
+
+png("HM SOM_1stTry, minmax scaling.png", width = 4000, height = 1200)
+ComplexHeatmap::Heatmap(data, cluster_column_slices = F, column_names_rot = -75, column_title_rot = 75,
+                        column_split = df[colnames(data), "SOM_1stTry_HCSubsets", drop=FALSE],
+                        top_annotation = ComplexHeatmap::HeatmapAnnotation(df = df, col = CYTdata2@clusteringData@clusteringPalette))
+dev.off()
+```
+
+## Clusters manipulation
+
+```{r}
+manual_Subsets = list("Population 1" = paste("MetaC", c(6,12), sep=""),
+                      "Population 2" = paste("MetaC", c(3:5,8), sep=""),
+                      "Population 3" = paste("MetaC", c(10:11,15,17,19), sep=""),
+                      "Population 4" = paste("MetaC", c(9,18,20), sep=""),
+                      "Population 5" = paste("MetaC", c(7,13), sep=""),
+                      "Population 6" = paste("MetaC", c(1,2,14,16), sep=""))
+PopulationsID = as.character(CYTdata2@clusteringData@cellClustering$FlowSOM_1stTry_FlowSOM_metaclusters)
+for (i in seq_along(manual_Subsets)) {
+  PopulationsID[PopulationsID %in% manual_Subsets[[i]]] = names(manual_Subsets)[i]
+}
+
+CYTdata2 = addManualClustering(CYTdata2,
+                              name = "PopulationsID",
+                              clusteringIDs = factor(PopulationsID, levels = names(manual_Subsets)),
+                              additionalPalette = NULL,
+                              checkOverwrite = TRUE)
+
+plotCells(CYTdata2,
+           expression = "DimRed", DimRed = "UMAP_1stTry",
+           percentDownsampling = 0.75,
+           colorBy = "clustering", clustering = "PopulationsID")
+popId = levels(CYTdata2@clusteringData@cellClustering$PopulationsID)
+CYTdata2 = changePalette(CYTdata2, type = "clustering", clustering = "PopulationsID", autoColorRainbow = F, 
+                         homemadePalette = structure(RColorBrewer::brewer.pal(length(popId), name = "Set1"), names = popId))
+plotCells(CYTdata2,
+           expression = "DimRed", DimRed = "UMAP_1stTry",
+           percentDownsampling = 0.75,
+           colorBy = "clustering", clustering = "PopulationsID")
+```
+
+
+```{r}
+CYTdata2@clusteringData@cellClustering
+```
+
+# Differential abundance analysis
+
+```{r, warning=F}
+CYTdata2@differentialTesting@data = data.frame()
+
+title = "Responder vs Non Responder"
+    
+comparisonSpl = list("NR spls" = CYTdata2@sampleData@sampleMetadata %>% arrange(Individual) %>% dplyr::filter(Group=="NR") %>% rownames(),
+                     "R spls" = CYTdata2@sampleData@sampleMetadata %>% arrange(Individual) %>% dplyr::filter(Group=="R") %>% rownames())
+
+CYTdata2 = runDifferentialTesting(CYTdata2,
+                                 clustering = "FlowSOM_1stTry_FlowSOM_SOMclusters", clusters = NULL,
+                                 
+                                 comparisonSpl = comparisonSpl,
+                                 referenceSplName = names(comparisonSpl)[1],
+                                 differentialTestingTitle = title,
+                                 
+                                 variable = "abundance", NFSValues = NULL, 
+                                 twogroupTest = "wilcox.test", p.adjust = "BH", paired = FALSE,
+                                 verbose = TRUE, checkOverwrite = F)
+
+CYTdata2@differentialTesting@data
+plotVolcano(CYTdata2,
+            differentialTestingTitle = title,
+            thPval = 0.05, thFC = 1.5,
+            displayAdjust = FALSE,
+            phenoColor = TRUE, signifOnly = TRUE) %>% plot()
+```
+
+# Gating function
+
+```{r, fig.height = 14, fig.width=18}
+plotPiechart(CYTdata2,
+             
+             clustering = "FlowSOM_1stTry_FlowSOM_metaclusters",
+             clusters = NULL,
+             
+             XaxisMetadata = "Individual",
+             YaxisMetadata = "Group",
+             
+             NFSValues = NULL,
+             
+             pieSize = TRUE,
+             colorBar = "#000000")
+
+CYTdata21 = CYTdataGating(CYTdata2, 
+                          samples = CYTdata2@sampleData@sampleMetadata %>% arrange(Individual) %>% dplyr::filter(Group=="R") %>% rownames())
+plotPiechart(CYTdata21,
+             
+             clustering = "FlowSOM_1stTry_FlowSOM_metaclusters",
+             clusters = NULL,
+             
+             XaxisMetadata = "Individual",
+             YaxisMetadata = "Group",
+             
+             NFSValues = NULL,
+             
+             pieSize = TRUE,
+             colorBar = "#000000")
+
+CYTdata22 = CYTdataGating(CYTdata2, 
+                          clustering = "FlowSOM_1stTry_FlowSOM_metaclusters",
+                          clusters = paste("MetaC", 1:10, sep=""))
+plotPiechart(CYTdata22,
+             
+             clustering = "FlowSOM_1stTry_FlowSOM_metaclusters",
+             clusters = NULL,
+             
+             XaxisMetadata = "Individual",
+             YaxisMetadata = "Group",
+             
+             NFSValues = NULL,
+             
+             pieSize = TRUE,
+             colorBar = "#000000")
+
+```

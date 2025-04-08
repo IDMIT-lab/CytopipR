@@ -1,124 +1,62 @@
-
-# # @title downsampling.density
-# # @description Downsample indexes representing sample's events with a density-based method (spade)
-# #
-# # @param indexes.to.downsample a numeric vector specifying the indexes of a sample's events in the dataset
-# # @param target.size a numeric value specifying the number of events targeted as downsampled, is smaller than the number of indexes to downsample
-# # @param whole.data.exprs a data.frame containing the entire dataset : all the marker's expression (used for density computation)
-# # @param exclude.pctile a numeric value, between 0 and 1, specifying the quantile value used to determine the exclusion threshold for density values
-# # @param compensate.uniform a boolean value : Density based downsampling doesn't permit us to get the exact size specified by "target.size". So, do we add a step to adjust randomly the donsampled indexes ?
-# #
-# # @return downsampled.indexes a numeric vector specifying the indexes downsampled
-#
-# downsampling.density <- function(indexes.to.downsample,
-#                                  target.size,
-#                                  whole.data.exprs,
-#                                  exclude.pctile,
-#                                  compensate.uniform,
-#                                  ncores){
-#   cat("- Exact size to dowsnample : ", target.size)
-#
-#   data.exprs = whole.data.exprs[indexes.to.downsample,]
-#
-#   ### SPADE density
-#   df.dists = parallelDist::parDist(x = as.matrix(data.exprs), method = "euclidean", threads = ncores) %>% as.matrix() %>% as.data.frame()
-#   idx.used.df.dists = sample(1:nrow(df.dists), 3*nrow(df.dists)/4)
-#   med.dists = apply(df.dists[idx.used.df.dists,], 1, min, na.rm=TRUE) %>% as.vector() %>% median()
-#   kernel.width = 20*med.dists
-#   boof.df.dists = (df.dists < kernel.width) %>% as.data.frame()
-#   density = apply(boof.df.dists, 1, sum, na.rm=TRUE) %>% as.vector()
-#   #################################
-#
-#   data = cbind.data.frame("density" = density, "indexes" = indexes.to.downsample,  data.exprs)
-#
-#   print(data)
-#   exclusion.boundary = stats::quantile(density, exclude.pctile, names=FALSE)
-#
-#   ## First step of DS : Spade exclusion
-#   data = subset(data, density > exclusion.boundary) # Selection by exclude.pctile
-#
-#   print(data)
-#
-#   n.compensate = target.size - nrow(data)
-#   if (n.compensate > 0){
-#     cat("- Number of cells, after spade exclusion : ", nrow(data), ". So no more density downsampling. Using uniform sampling to compensate and sample the exact size..")
-#     remaining.idx = indexes.to.downsample[!indexes.to.downsample %in% data$indexes]
-#     compensate.idx = sample(remaining.idx, n.compensate)
-#     downsampled.indexes = c(data$indexes, compensate.idx)
-#   }
-#   else {
-#     ## Second step of DS : Target size and boundary estimation
-#     density.sorted = sort(data$density)
-#     cdf = rev(cumsum(1/rev(density.sorted)))
-#     target.boundary = target.size/cdf[1]
-#     if (target.boundary > density.sorted[1]) {
-#       targets = (target.size-seq(1,length(density.sorted))) / cdf
-#       target.boundary = targets[which.min(targets-density.sorted > 0)]
-#     }
-#     data = subset(data, target.boundary/density > stats::runif(nrow(data))) # Selection by ~target.size
-#     cat("- For a sample, the number of cells, after the finished downsampling (density) process, is : ", nrow(data))
-#     n.compensate = target.size - nrow(data)
-#     if (n.compensate > 0){
-#       cat("- Using uniform sampling to compensate and sample the exact size..")
-#       remaining.idx = indexes.to.downsample[!indexes.to.downsample %in% data$indexes]
-#       compensate.idx = sample(remaining.idx, n.compensate)
-#       downsampled.indexes = c(data$indexes, compensate.idx)
-#     }
-#     else if (n.compensate < 0){
-#       cat("- Using uniform sampling to compensate and sample the exact size..")
-#       n.compensate = abs(n.compensate)
-#       compensate.idx = sample(data$indexes, n.compensate)
-#       downsampled.indexes = data$indexes[!data$indexes %in% compensate.idx]
-#     }
-#   }
-#   return(downsampled.indexes)
-# }
-# @param type a string value specifying the type of downsampling selection used ("none" if no downsampling is performed, "uniform" uniformly-based, "density" density-based)
-# @param parallel.ncores a numeric value specifying the number of logical processor used for parallel computation
-# @param density.exclusion.pctile a numeric value, between 0 and 1, specifying, the quantile value used to determine the exclusion threshold for density values (expected if "density" selected)
-# @param densityCompensate a boolean value : Density based downsampling doesn't permit us to get the exact size specified by "target.size". So, do we add a step to adjust randomly the donsampled indexes ? (expected if "density" selected)
-# type = c("uniform", "density"),
-# densityPercentile = 0.01,
-# densityCompensate = FALSE,
-# densityNcores = 1
-
-# switch(type,
-#        uniform = {
-#          downsampling.function <- function(indexes, size) {
-#            return(sample(indexes, size)) # replace = FALSE by default
-#          }
-#        },
-#        density = {
-#          checkmate::qassert(density.exclusion.pctile, "N1")
-#          checkmate::qassert(densityCompensate, "B1")
-#          checkmate::qassert(density.ncores, "N1")
-#          list.density.parameters = list("density.exclusion.pctile" = density.exclusion.pctile,
-#                                         "densityCompensate" = densityCompensate,
-#                                         "density.ncores" = density.ncores)
-#          cat("\n\n - The downsampling density parameters are :",
-#              paste0(names(list.density.parameters), "=", list.density.parameters, collapse = ", "))
-#          downsampling.function <- function(indexes, size) {
-#            return(downsampling.density(indexes.to.downsample = indexes,
-#                                        target.size = size,
-#                                        whole.data.exprs = CYTdata@matrix.expression,
-#                                        exclude.pctile = density.exclusion.pctile,
-#                                        compensate.uniform = densityCompensate,
-#                                        ncores = density.ncores) )}
-#        })
-
-#' @title Performs the downsampling of events
-#' @description Perform the downsampling, using uniformly-based or density-based random selections, of events
+#' @title Downsample Data in CYTdata Object
 #'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param type a string value specifying the way the number of downsampled events is determined ("by.sample" to take the smallest size of sample, "by.number" to take an absolute size, "by.percent" to take a part of each sample)
-#' @param absolute a numeric value specifying the exact number of downsampled events (expected if "by.number" selected)
-#' @param percentage a numeric value specifying the percent of each sample size taken as number of downsampled events (expected if "by.percent" selected)
-#' @param seed a numeric value : the seed for RNG
+#' @description
+#' This function performs downsampling on a CYTdata object. The downsampling can be done in various ways:
+#' - **absolute**: Downsampling the entire dataset to a fixed number of cells.
+#' - **percent**: Downsampling the entire dataset by a given percentage of cells.
+#' - **smallSample**: Downsampling each sample to the size of the smallest sample.
+#' - **percentSample**: Downsampling each sample independently by a given percentage.
+#' - **absoluteSample**: Downsampling each sample to an absolute number of cells.
 #'
-#' @return a S4 object of class 'CYTdata'
+#' @param CYTdata A CYTdata object containing the dataset to be downsampled.
+#' @param type A character string specifying the downsampling type. Valid options are:
+#'   - `"absolute"`: Downsample the entire dataset to a fixed number of cells.
+#'   - `"percent"`: Downsample the entire dataset by a percentage.
+#'   - `"smallSample"`: Downsample each sample to the size of the smallest sample.
+#'   - `"percentSample"`: Downsample each sample independently by a given percentage.
+#'   - `"absoluteSample"`: Downsample each sample to a fixed number of cells.
+#' @param absolute A positive integer specifying the number of cells for downsampling (used in `"absolute"`, `"absoluteSample"`).
+#' @param percentage A numeric value between 0 and 1 representing the proportion of the total number of cells to retain (used in `"percent"` and `"percentSample"`).
+#' @param seed A numeric value for the random seed, to ensure reproducibility of the downsampling process.
 #'
+#' @return A CYTdata object containing the downsampled data.
+#'
+#' @details
+#' This function provides several methods for downsampling the data in the `CYTdata` object:
+#' - If `type = "absolute"`, it will select a fixed number of cells from the entire dataset.
+#' - If `type = "percent"`, it will select a fixed percentage of cells from the entire dataset.
+#' - If `type = "smallSample"`, each sample will be downsampled to the size of the smallest sample.
+#' - If `type = "percentSample"`, each sample will be downsampled by the specified percentage.
+#' - If `type = "absoluteSample"`, each sample will be downsampled to the specified absolute number of cells.
+#'
+#' The function updates the following components of the CYTdata object:
+#' - `cellExprs`
+#' - `cellAdditionalexprs`
+#' - `cellSample`
+#' - `sampleMetadata`
+#' - `cellClustering`
+#' - `cellDimRed`
+#'
+#' @examples
+#' # Example 1: Downsample the dataset to 50% of cells
+#' CYTdata_downsampled <- downsampleData(CYTdata = CYTdata, type = "percent", percentage = 0.5)
+#'
+#' # Example 2: Downsample each sample to 1000 cells
+#' CYTdata_downsampled <- downsampleData(CYTdata = CYTdata, type = "absoluteSample", absolute = 1000)
+#'
+#' # Example 3: Downsample the dataset by 30% of total cells
+#' CYTdata_downsampled <- downsampleData(CYTdata = CYTdata, type = "percent", percentage = 0.3)
+#'
+#' # Example 4: Downsample each sample to the smallest sample size
+#' CYTdata_downsampled <- downsampleData(CYTdata = CYTdata, type = "smallSample")
+#'
+#' @seealso
+#' \code{\link{checkValidity}} for validating the CYTdata object before downsampling.
+#'
+#' @import checkmate
+#' @import dplyr
+#' @import plyr
 #' @export
-#'
 
 downsampleData <- function(CYTdata,
                            type = c("absolute", "percent", "smallSample", "percentSample", "absoluteSample"),
@@ -212,3 +150,5 @@ downsampleData <- function(CYTdata,
   CYTdata = checkValidity(CYTdata, mode = "warning")
   return(CYTdata)
 }
+
+

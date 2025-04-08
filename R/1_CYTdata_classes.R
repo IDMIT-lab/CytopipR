@@ -3,11 +3,14 @@
 #################################################################################### cellData ####################################################################################
 ########################################################################################################################################################################################
 
-#' @title ---------
+#' @title cellData class
 #'
-#' @description ---------
+#' @description
+#' This class stores cell expression data, dimensionality reduction results, and any additional expression-related data for cells.
 #'
-#' @slot ---------
+#' @slot cellExprs A data frame containing the expression data of cells.
+#' @slot cellDimRed A list containing the results of dimensionality reduction applied to cell expression data.
+#' @slot cellAdditionalexprs A data frame containing any additional expression-related data for cells.
 #'
 #' @name cellData-class
 #' @rdname cellData-class
@@ -19,17 +22,6 @@ cellData <- methods::setClass("cellData",
                                         cellAdditionalexprs = "data.frame"))
 
 
-#' @title ---------
-#'
-#' @description ---------
-#'
-#' @param ---------
-#'
-#' @return ---------
-#'
-#'
-#' @export
-#'
 
 import_cellData <- function(CYTdata, imported_cellData_Object, checkOverwrite=TRUE){
   CYTdata = checkValidity(CYTdata, mode = "error")
@@ -47,18 +39,6 @@ import_cellData <- function(CYTdata, imported_cellData_Object, checkOverwrite=TR
   return(CYTdata)
 }
 
-#' @title ---------
-#'
-#' @description ---------
-#'
-#' @param ---------
-#'
-#' @return ---------
-#'
-#'
-#' @export
-#'
-
 remove_cellData <- function(CYTdata){
   CYTdata = checkValidity(CYTdata, mode = "error")
   message("\nRemoving cellData slot in CYTdata object, but keeping cellExprs dataframe (can not be empty)...")
@@ -66,18 +46,6 @@ remove_cellData <- function(CYTdata){
   CYTdata = checkValidity(CYTdata, mode = "warning")
   return(CYTdata)
 }
-
-#' @title ---------
-#'
-#' @description ---------
-#'
-#' @param ---------
-#'
-#' @return ---------
-#'
-#'
-#' @export
-#'
 
 export_cellData <- function(CYTdata){
   CYTdata = checkValidity(CYTdata, mode = "error")
@@ -90,11 +58,15 @@ export_cellData <- function(CYTdata){
 ########################################################################################################################################################################################
 
 
-#' @title ---------
+#' @title sampleData class
 #'
-#' @description ---------
+#' @description
+#' This class stores sample-related data, including sample-specific metadata and any additional sample-related data.
 #'
-#' @slot ---------
+#' @slot cellSample A data frame containing cell-level data for the sample.
+#' @slot sampleMetadata A data frame containing metadata for each sample.
+#' @slot metadataPalette A list containing color palettes used for the sample metadata visualization.
+#' @slot sampleAdditionaldata A data frame containing any additional data associated with the sample.
 #'
 #' @name sampleData-class
 #' @rdname sampleData-class
@@ -106,17 +78,7 @@ sampleData <- methods::setClass("sampleData",
                                           metadataPalette = "list",
                                           sampleAdditionaldata = "data.frame"))
 
-#' @title ---------
-#'
-#' @description ---------
-#'
-#' @param ---------
-#'
-#' @return ---------
-#'
-#'
-#' @export
-#'
+
 
 import_sampleData <- function(CYTdata, imported_sampleData_Object, checkOverwrite=TRUE){
   CYTdata = checkValidity(CYTdata, mode = "error")
@@ -134,18 +96,6 @@ import_sampleData <- function(CYTdata, imported_sampleData_Object, checkOverwrit
   return(CYTdata)
 }
 
-#' @title ---------
-#'
-#' @description ---------
-#'
-#' @param ---------
-#'
-#' @return ---------
-#'
-#'
-#' @export
-#'
-
 remove_sampleData <- function(CYTdata){
   CYTdata = checkValidity(CYTdata, mode = "error")
   message("\nRemoving sampleData slot in CYTdata object, but keeping cellSample dataframe (can not be empty)...")
@@ -153,17 +103,6 @@ remove_sampleData <- function(CYTdata){
   CYTdata = checkValidity(CYTdata, mode = "warning")
   return(CYTdata)
 }
-
-#' @title ---------
-#'
-#' @description ---------
-#'
-#' @param ---------
-#'
-#' @return ---------
-#'
-#' @export
-#'
 
 export_sampleData <- function(CYTdata){
   CYTdata = checkValidity(CYTdata, mode = "error")
@@ -174,11 +113,13 @@ export_sampleData <- function(CYTdata){
 #################################################################################### clusteringData ####################################################################################
 ########################################################################################################################################################################################
 
-#' @title ---------
+#' @title clusteringData class
 #'
-#' @description ---------
+#' @description
+#' This class stores the clustering information for the cells, including cell clustering assignments and associated color palettes.
 #'
-#' @slot ---------
+#' @slot cellClustering A data frame containing the clustering assignments for the cells.
+#' @slot clusteringPalette A list containing the color palettes used for clustering visualization.
 #'
 #' @name clusteringData-class
 #' @rdname clusteringData-class
@@ -187,17 +128,6 @@ export_sampleData <- function(CYTdata){
 clusteringData <- methods::setClass("clusteringData",
                                     slots = c(cellClustering = "data.frame",
                                               clusteringPalette = "list"))
-
-#' @title ---------
-#'
-#' @description ---------
-#'
-#' @param ---------
-#'
-#' @return ---------
-#'
-#' @export
-#'
 
 import_clusteringData <- function(CYTdata, imported_clusteringData_Object, checkOverwrite=TRUE){
   CYTdata = checkValidity(CYTdata, mode = "error")
@@ -215,17 +145,6 @@ import_clusteringData <- function(CYTdata, imported_clusteringData_Object, check
   return(CYTdata)
 }
 
-#' @title ---------
-#'
-#' @description ---------
-#'
-#' @param ---------
-#'
-#' @return ---------
-#'
-#' @export
-#'
-
 remove_clusteringData <- function(CYTdata){
   CYTdata = checkValidity(CYTdata, mode = "error")
   message("\nRemoving clusteringData slot in CYTdata object...")
@@ -233,17 +152,6 @@ remove_clusteringData <- function(CYTdata){
   CYTdata = checkValidity(CYTdata, mode = "warning")
   return(CYTdata)
 }
-
-#' @title ---------
-#'
-#' @description ---------
-#'
-#' @param ---------
-#'
-#' @return ---------
-#'
-#' @export
-#'
 
 export_clusteringData <- function(CYTdata){
   CYTdata = checkValidity(CYTdata, mode = "error")
@@ -255,11 +163,12 @@ export_clusteringData <- function(CYTdata){
 ############################################################## differentialTesting, Kinetic, TrajectoryInference #####################################################################
 ########################################################################################################################################################################################
 
-#' @title ---------
+#' @title differentialTesting class
 #'
-#' @description ---------
+#' @description
+#' This class stores data related to differential testing results, typically in the form of a data frame containing statistical results for comparisons between different conditions or groups.
 #'
-#' @slot ---------
+#' @slot data A data frame containing the differential testing results, such as p-values, test statistics, fold changes, etc.
 #'
 #' @name differentialTesting-class
 #' @rdname differentialTesting-class
@@ -267,11 +176,12 @@ export_clusteringData <- function(CYTdata){
 
 differentialTesting <- methods::setClass("differentialTesting", slots = c(data = "data.frame"))
 
-#' @title ---------
+#' @title Kinetic class
 #'
-#' @description ---------
+#' @description
+#' This class stores data related to kinetic analysis, typically a list containing various components or results of kinetic modeling.
 #'
-#' @slot ---------
+#' @slot data A list containing the results of kinetic analysis, which could include different types of kinetic data such as parameters, model fits, or simulation results.
 #'
 #' @name Kinetic-class
 #' @rdname Kinetic-class
@@ -279,11 +189,17 @@ differentialTesting <- methods::setClass("differentialTesting", slots = c(data =
 
 Kinetic <- methods::setClass("Kinetic", slots = c(data = "list"))
 
-#' @title ---------
+#' @title TrajectoryInference class
 #'
-#' @description ---------
+#' @description
+#' This class is used to store information about a trajectory inference analysis, including details about the root and leaf cells,
+#' the inferred network, walk paths, and differential trajectory results.
 #'
-#' @slot ---------
+#' @slot root.cells A vector containing the identifiers of the root cells in the trajectory analysis.
+#' @slot leaf.cells A vector containing the identifiers of the leaf cells in the trajectory analysis.
+#' @slot network A list containing the network representation of the trajectory inference.
+#' @slot walk A list that stores the inferred walk paths through the trajectory network.
+#' @slot diff.traj A list containing the results of differential trajectory analysis.
 #'
 #' @name TrajectoryInference-class
 #' @rdname TrajectoryInference-class
@@ -296,6 +212,22 @@ TrajectoryInference <- methods::setClass("TrajectoryInference", slots = c(root.c
 ####################################################################################### CYTdata ########################################################################################
 ########################################################################################################################################################################################
 
+#' @title CYTdata class
+#'
+#' @description
+#' This is the main data container for all the biological data, including cell data, sample data, clustering data, and other analysis results.
+#'
+#' @param cellData A `cellData` object containing cell-level expression and additional data.
+#' @param sampleData A `sampleData` object containing sample-level data and metadata.
+#' @param clusteringData A `clusteringData` object containing clustering results and associated color palettes.
+#' @param differentialTesting A `differentialTesting` object containing results from differential testing.
+#' @param Kinetic A `Kinetic` object containing kinetic data.
+#' @param TrajectoryInference A `TrajectoryInference` object containing trajectory inference results.
+#'
+#' @name CYTdata-class
+#' @rdname CYTdata-class
+#' @exportClass CYTdata
+
 CYTdata <- methods::setClass("CYTdata",
                              slots = c(cellData = "cellData",
                                        sampleData = "sampleData",
@@ -305,17 +237,20 @@ CYTdata <- methods::setClass("CYTdata",
                                        TrajectoryInference = "TrajectoryInference"))
 
 
-#' @title ---------
+#' @title Validate CYTdata Object
 #'
-#' @description ---------
+#' @description
+#' This function validates the structure and contents of a CYTdata object, ensuring that the object and its slots are of the correct classes, and that the data within each slot meets specific criteria.
+#' The function checks:
+#' - Class consistency for each slot.
+#' - Integrity of data in specific data frames and lists (e.g., no missing values, proper naming conventions).
 #'
-#' @param ---------
+#' @param object A CYTdata object to be validated.
+#' @param mode A string specifying the mode of the validation: "error" (raises errors) or "warning" (shows warnings).
 #'
-#' @return ---------
-#'
+#' @return The input CYTdata object if all checks pass. If any validation fails, an error or warning is raised based on the mode.
 #'
 #' @export
-#'
 
 checkValidity = function(object, mode = c("error", "warning")) {
 

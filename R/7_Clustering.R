@@ -1,56 +1,39 @@
-#' @title Renames markers within a CYTdata object
+#' @title Rename Clustering Columns or Cluster IDs in CYTdata
 #'
-#' @description This function aims to rename cell markers stored within a CYTdata object.
+#' @description
+#' This function allows you to rename clustering column names or the cluster IDs in a `CYTdata` object. Depending on the input, it can either rename the column names of clustering data or rename the individual cluster IDs (levels) within a specified clustering column. Optionally, duplicate cluster levels can be merged if necessary.
 #'
-#' This function is interesting to remove the names of the fluorochromes or metals recorded during the acquisition process.
+#' @param CYTdata A CYTdata object containing the clustering data to be renamed.
+#' @param clustering A string specifying the name of the clustering column to rename cluster IDs (optional). If `NULL`, the function will rename the clustering column names instead.
+#' @param merge A logical indicating whether duplicated clustering levels should be merged if they share the same name after renaming. Default is `TRUE`.
+#' @param from A character vector of clustering names to be renamed (either column names or cluster IDs).
+#' @param to A character vector of new names for the clustering columns or cluster IDs.
 #'
-#' @param CYTdata a S4 object of class 'CYTdata'
+#' @return A CYTdata object with renamed clustering columns or cluster IDs.
 #'
-#' @return a S4 object of class 'CYTdata'
+#' @details
+#' This function performs two operations depending on the provided parameters:
+#' 1. **Renaming clustering columns**: If the `clustering` argument is `NULL`, the function will rename the columns of the `cellClustering` dataframe. The `from` argument should contain the existing column names, and `to` should contain the new column names. The lengths of `from` and `to` must be equal.
+#' 2. **Renaming cluster IDs**: If the `clustering` argument is specified, the function renames the cluster IDs within that column. The `from` argument contains the old cluster IDs, and the `to` argument contains the new names for those clusters. If the new names result in duplicate clusters, the `merge` argument controls whether the duplicates should be merged.
 #'
-#'@export
+#' The function checks for various errors, such as mismatched lengths between `from` and `to`, missing or duplicated names, and invalid clustering names or IDs.
 #'
-
-checkorderClustering <- function(CYTdata, clustering, clusters = NULL, order = TRUE, checkDuplicates = TRUE){
-
-  #CYTdata = checkValidity(CYTdata, mode = "error")
-  checkmate::qassert(clustering, "S1")
-  checkmate::qassert(clusters, c(0, "S*"))
-  checkmate::qassert(order, "B1")
-  checkmate::qassert(checkDuplicates, "B1")
-
-  if (nrow(CYTdata@clusteringData@cellClustering)==0 && ncol(CYTdata@clusteringData@cellClustering)==0) { stop("Error : clusteringData slot is empty") }
-
-  if (!clustering %in% colnames(CYTdata@clusteringData@cellClustering)) {
-    stop("Error : 'clustering' argument is not a clustering column in cellClustering dataframe (clustering columns :", paste0(colnames(CYTdata@clusteringData@cellClustering), collapse = ", "), ").")
-  }
-
-  clusterID = levels(CYTdata@clusteringData@cellClustering[,clustering])
-  if (is.null(clusters)) { clusters = clusterID }
-
-  if (checkDuplicates) {
-    clustersdup = clusters[duplicated(clusters)]
-    if (length(clustersdup)>0) { stop("Error : 'clusters' argument contain duplicated values ( ", paste0(clustersdup, collapse = ", "), " ). It must be vector of unique clusters of" , clustering, "column.") }
-  }
-  splErr = setdiff(clusters, clusterID)
-  if (length(splErr)>0) { stop("Error in CYTdata object, clusteringData slot: 'clusters' argument providing clusters", paste0(splErr, collapse=", "), "not present in", clustering, "column of cellClustering dataframe") }
-  if (order) { clusters = clusterID[clusterID %in% clusters] }
-  return(clusters)
-}
-
-
-#' @title Renames Clustering within a CYTdata object
+#' @examples
+#' # Example 1: Rename clustering columns
+#' CYTdata_corrected <- renameClustering(CYTdata, from = c("oldClust1", "oldClust2"), to = c("newClust1", "newClust2"))
 #'
-#' @description This function aims to rename Clustering stored within a CYTdata object.
+#' # Example 2: Rename cluster IDs within a specific clustering column
+#' CYTdata_corrected <- renameClustering(CYTdata, clustering = "clusterColumn", from = c("clusterA", "clusterB"), to = c("clusterX", "clusterY"))
 #'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param from a character vector providing the sample names to replace. By default, all sample names are replaced
-#' @param to a character vector providing the new sample names to use
+#' # Example 3: Merge duplicated cluster IDs after renaming
+#' CYTdata_corrected <- renameClustering(CYTdata, clustering = "clusterColumn", from = c("clusterA", "clusterB"), to = c("clusterA", "clusterA"), merge = TRUE)
 #'
-#' @return a S4 object of class 'CYTdata'
+#' @seealso
+#' \code{\link{plyr::mapvalues}} for mapping old values to new values.
 #'
-#'@export
-#'
+#' @import checkmate
+#' @import plyr
+#' @export
 
 renameClustering <- function(CYTdata, clustering = NULL, merge = TRUE, from = NULL, to){
 
@@ -114,116 +97,38 @@ renameClustering <- function(CYTdata, clustering = NULL, merge = TRUE, from = NU
   return(CYTdata)
 }
 
-
-
-# pasteClustering <- function(CYTdata, clusterings, newClustering, clusteringSep = "_", clusteringPalette){
-#
-#   CYTdata = checkValidity(CYTdata, mode = "error")
-#   if (nrow(CYTdata@clusteringData@cellClustering)==0 && ncol(CYTdata@clusteringData@cellClustering)==0) { stop("Error : clusteringData slot is empty") }
-#
-#   checkmate::qassert(clusterings, "S*")
-#   checkmate::qassert(newClustering, "S1")
-#   checkmate::qassert(clusteringSep, "S1")
-#
-#   if (length(clusterings)<2) { stop() }
-#
-#   clErr = setdiff(clusterings, colnames(CYTdata@clusteringData@cellClustering))
-#   if (length(clErr)>0) {
-#     stop("Error : 'clusterings' argument (", paste0(clusterings, collapse=", "),
-#          ") contains names not being clustering column names(", paste0(clErr, collapse=", "), ")")
-#   }
-#   if (newClustering %in% colnames(CYTdata@clusteringData@cellClustering)) {
-#     stop("Error : 'newClustering' argument provide name already being a clustering column name (", newClustering, ")")
-#   }
-#   if (!clusteringPalette %in% clusterings) {
-#     stop("Error : 'clusteringPalette' argument provide name (", clusteringPalette,
-#          ") not being a clustering column name contained in 'clusterings' argument (", paste0(clusterings, collapse=", "), ").")
-#   }
-#
-#   cat("\n\nCurrent clustering column names of cellClustering dataframe :", paste0(clusterings, collapse=", "), "\n")
-#   cat("\n\nWill be pasted, with the seperation operator '", clusteringSep,
-#       "', into the following clustering column name : '", newClustering,
-#       "'. And the clustering palette will be heritated from : '", clusteringPalette, "'.")
-#
-#   CYTdata@clusteringData@cellClustering[,newClustering] = CYTdata@clusteringData@cellClustering[,clusterings] %>%
-#     apply(1, function(x) paste(x, collapse = clusteringSep))
-#
-#   #CYTdata@clusteringData@clusteringPalette[clusteringPalette] CYTdata@clusteringData@cellClustering[,clusteringPalette]
-#
-#   if (is.null(clustering)) { # Rename clustering columns
-#     if (is.null(from)) { from = colnames(CYTdata@clusteringData@cellClustering) }
-#     else {
-#       clErr = setdiff(from, colnames(object@clusteringData@cellClustering))
-#       if (length(clErr)>0) { stop("Error : 'from' argument contains names not present among cellClustering's clustering column names (", paste0(clErr, collapse=", "), ".") }
-#     }
-#     if (length(from)!=length(to)) { stop("Error : Length of argument 'from' (", length(from), ") and argument 'to' (", length(to), ") must be equal") }
-#     dupfrom = unique(from[duplicated(from)])
-#     if (length(dupfrom)>0) { stop("Error : Argument 'from' contains duplicated clustering column names :", paste0(dupfrom, collapse=", ")) }
-#     dupto = unique(to[duplicated(to)])
-#     if (length(dupto)>0) { stop("Error : Argument 'to' contains duplicated names :", paste0(dupto, collapse=", ")) }
-#
-#     cat("\n\nCurrent clustering column names of cellClustering dataframe are (in the order) :", paste0(colnames(CYTdata@clusteringData@cellClustering), collapse = ", "), "\n")
-#     cat("\n\nThe following values :")
-#     cat("\n - ", paste0(from, collapse=", "))
-#     cat("\n\nwill be renamed, in the order, by :")
-#     cat("\n - ", paste0(to, collapse=", "))
-#     colnames(CYTdata@clusteringData@cellClustering)[match(colnames(CYTdata@clusteringData@cellClustering), from)] = to
-#   }
-#   else { # Rename clusters names
-#     if (!clustering %in% colnames(CYTdata@clusteringData@cellClustering)) {
-#       stop("Error : 'clustering' argument (", clustering, ") is not NULL or a clustering column names")
-#     }
-#     oldclulev = levels(CYTdata@clusteringData@cellClustering[,clustering])
-#     if (is.null(from)) { from = oldclulev }
-#     else {
-#       clErr = setdiff(from, oldclulev)
-#       if (length(clErr)>0) { stop("Error : 'from' argument contains clustering values not present among", clustering, "clustering values (", paste0(clErr, collapse=", "), ".") }
-#       dupfrom = unique(from[duplicated(from)])
-#       if (length(dupfrom)>0) { stop("Error : Argument 'from' contains duplicated", clustering, "clustering values :", paste0(dupfrom, collapse=", ")) }
-#     }
-#     if (length(from)!=length(to)) { stop("Error : Length of argument 'from' (", length(from), ") and argument 'to' (", length(to), ") must be equal") }
-#     if (length(to) == 1) { to = rep(to, length(from)) }
-#     newclulev = oldclulev
-#     newclulev[match(from, newclulev)] = to
-#
-#     levdup = unique(newclulev[duplicated(newclulev)])
-#     if (length(levdup)>0){
-#       message("After renaming, several ", clustering, "'s cluster IDs have the same name (",  paste0(levdup, collapse=", "), "), either by renaming to an already existing and unchanged clustering value, or by duplicate in the 'to' argument, or both.")
-#       if (merge) { message("\nWarning : 'merge' argument is set to TRUE. After renaming,", clustering, " column of cellClustering dataframe get its duplicated levels merged.") }
-#       else { stop("\nError : 'merge' argument is set to FALSE. CYTdata unchanged.") }
-#     }
-#     cat("\n\nCurrent", clustering, "'s cluster IDs (levels) are (in the order) :", paste0(oldclulev, collapse = ", "), "\n")
-#     cat("\n\nThe following values :")
-#     cat("\n - ", paste0(from, collapse=", "))
-#     cat("\n\nwill be renamed, in the order, by :")
-#     cat("\n - ", paste0(to, collapse=", "))
-#     CYTdata@clusteringData@cellClustering[,clustering] = plyr::mapvalues(CYTdata@clusteringData@cellClustering[,clustering], from = from, to = to)
-#   }
-#   CYTdata = checkValidity(CYTdata, mode = "warning")
-#   return(CYTdata)
-# }
-
-
-#' @title Assigns meta-information about biological samples
+#' @title Reorder Clustering Levels in CYTdata object
 #'
-#' @description This function aims to attach meta-information to each biological sample.
+#' @description
+#' This function allows you to reorder the levels of a specified clustering column in the `CYTdata` object. The clustering levels can be reordered either alphabetically or based on a custom order provided by the user.
 #'
-#' Especially, the following meta-information of each sample can be specified for subsequent analyses.
-#' - The biological individual
-#' - The biological condition (groups, vaccines, studies, etc.)
-#' - The timepoint
-#' Timepoint and Individual data must be specified.
+#' @param CYTdata A `CYTdata` object containing the clustering data that will be reordered.
+#' @param clustering A string specifying the name of the clustering column whose levels are to be reordered.
+#' @param alphabetic A logical indicating whether the clustering levels should be sorted alphabetically. Default is `TRUE`.
+#' @param newOrder A character vector specifying a custom order for the clustering levels. This argument is used only if `alphabetic` is set to `FALSE`. If `alphabetic` is `TRUE`, `newOrder` is ignored.
 #'
-#' @param CYTdata a CYTdata object
-#' @param clustering a dataframe containing meta-information about the biological samples.
-#' The columns must contain, at least, a column named "Timepoint" and an other named "Individual".
-#' The rownames have to be the biological samples, thus the number rows has to be equal to the number of samples.
+#' @return A `CYTdata` object with the reordered clustering levels.
 #'
-#' @return a S4 object of class 'CYTdata'
+#' @details
+#' This function allows you to reorder the clustering levels of a specified column in the `cellClustering` dataframe. You can reorder the levels alphabetically (using the `alphabetic` argument) or specify a custom order using the `newOrder` argument.
 #'
+#' If `alphabetic` is set to `TRUE`, the clustering levels will be reordered alphabetically. If `alphabetic` is set to `FALSE`, the `newOrder` argument must be provided, and the function will reorder the clustering levels according to the values in `newOrder`. The `newOrder` argument must contain values that are present in the existing clustering levels and must not contain duplicates.
 #'
+#' The function performs several checks to ensure the validity of the inputs, including checking if the specified clustering column exists, if the provided custom order is valid, and if the levels contain duplicates.
+#'
+#' @examples
+#' # Example 1: Reorder clustering levels alphabetically
+#' CYTdata_corrected <- reorderClustering(CYTdata, clustering = "clusterColumn", alphabetic = TRUE)
+#'
+#' # Example 2: Reorder clustering levels based on a custom order
+#' CYTdata_corrected <- reorderClustering(CYTdata, clustering = "clusterColumn", alphabetic = FALSE, newOrder = c("clusterB", "clusterA", "clusterC"))
+#'
+#' @seealso
+#' \code{\link{gtools::mixedsort}} for sorting the levels alphabetically while preserving the numeric order.
+#'
+#' @import checkmate
+#' @import gtools
 #' @export
-#'
 
 reorderClustering <- function(CYTdata, clustering, alphabetic = TRUE, newOrder = NULL){
 
@@ -254,28 +159,35 @@ reorderClustering <- function(CYTdata, clustering, alphabetic = TRUE, newOrder =
   return(CYTdata)
 }
 
-#' @title Assigns meta-information about biological samples
+#' @title Check Metaclustering Membership for Clusters
 #'
-#' @description This function aims to attach meta-information to each biological sample.
+#' @description
+#' This function checks the membership of clusters in a given metaclustering in the `CYTdata` object. It ensures that each cluster has cells that belong to only one metacluster and returns a data frame showing the metacluster membership for each cluster.
 #'
-#' Especially, the following meta-information of each sample can be specified for subsequent analyses.
-#' - The biological individual
-#' - The biological condition (groups, vaccines, studies, etc.)
-#' - The timepoint
-#' Timepoint and Individual data must be specified.
+#' @param CYTdata A `CYTdata` object containing the clustering and metaclustering data.
+#' @param clustering A string specifying the name of the clustering column in the `cellClustering` data frame.
+#' @param metaclustering A string specifying the name of the metaclustering column in the `cellClustering` data frame.
 #'
-#' @param CYTdata a CYTdata object
-#' @param clustering a dataframe containing meta-information about the biological samples.
-#' The columns must contain, at least, a column named "Timepoint" and an other named "Individual".
-#' The rownames have to be the biological samples, thus the number rows has to be equal to the number of samples.
+#' @return A data frame with two columns:
+#' - `metaclusters`: The metacluster labels corresponding to each cluster.
+#' - `clusters`: The cluster labels.
 #'
-#' @return a S4 object of class 'CYTdata'
+#' @details
+#' This function checks if each cluster from the specified `clustering` column belongs exclusively to one metacluster from the `metaclustering` column. If any cluster contains cells from multiple metaclusters, an error is raised. The function then returns a data frame mapping each cluster to its corresponding metacluster.
 #'
+#' If the input `clustering` and `metaclustering` columns have multiple metacluster memberships for a cluster, the function stops and reports which clusters have cells assigned to distinct metaclusters.
 #'
+#' @examples
+#' # Example: Get metaclustering membership for clusters in CYTdata
+#' membership = checkgetMetaclusteringMembership(CYTdata, clustering = "clusterColumn", metaclustering = "metaClusterColumn")
+#'
+#' @seealso
+#' \code{\link{table}} for generating contingency tables, which is used in this function to check memberships.
+#'
+#' @import checkmate
 #' @export
-#'
 
-checkgetMetaclutseringMembership <- function(CYTdata,
+checkgetMetaclusteringMembership <- function(CYTdata,
                                              clustering,
                                              metaclustering) {
   CYTdata = checkValidity(CYTdata, mode = "error")
@@ -301,58 +213,51 @@ checkgetMetaclutseringMembership <- function(CYTdata,
 }
 
 
-# @title Internal - Rescales marker expression by quantile
-#
-# @description This function is used internally to rescale the marker expression by the quantile method.
-#
-# @param exprs a vector containing one marker expression
-# @param quant.low a numeric value providing the value of the first quantile
-# @param quant.high a numeric value providing the value of the last quantile
-#
-# @return a data.frame containing quantile rescale marker expressions
-#
 
-exprsScaling <- function(data,
-                         typeScaling = c("none", "center", "reduced", "center_reduced", "rescale_min_max"),
-                         rescaleQt = c(0.05, 0.95), rescaleBorders = c(0,1)) {
-  typeScaling = match.arg(typeScaling)
-  checkmate::qassert(typeScaling, "S1")
-  checkmate::qassert(rescaleBorders, "N2")
-  checkmate::qassert(rescaleQt, "N2")
-  if (any(rescaleQt<=0) || any(rescaleQt>=1)) {
-    stop("Error : rescaleQt argument must be a vector a 2 integer between 0 and 1.")
-  }
 
-  sca <- function(exp) {
-    switch(typeScaling,
-           none = {exp = exp},
-           center = {exp = scale(exp, center=T, scale=F)},
-           reduced = {exp = scale(exp, center=F, scale=T)},
-           center_reduced = {exp = scale(exp, center=T, scale=T)},
-           rescale_min_max = {
-             quantiles = stats::quantile(exp, probs = rescaleQt)
-             low = quantiles[1]
-             high = quantiles[2]
-             exp[exp<low] = low
-             exp[exp>high] = high
-             exp = scales::rescale(exp, from = c(low, high), to = rescaleBorders)
-            })
-    return(exp)
-  }
-  data = data %>% mutate_all(sca)
-  return(data)
-}
-
-# @title Internal - Rescales marker expression by quantile
-#
-# @description This function is used internally to rescale the marker expression by the quantile method.
-#
-# @param exprs a vector containing one marker expression
-# @param quant.low a numeric value providing the value of the first quantile
-# @param quant.high a numeric value providing the value of the last quantile
-#
-# @return a data.frame containing quantile rescale marker expressions
-#
+#' @title Compute MSI (Marker or DimRed) for Clusters
+#'
+#' @description
+#' This function computes the MSI (Median/Mean of Scaled Expression) for each cluster in a specified `clustering` column using either marker expression data or dimensionality reduction (DimRed) data. The function performs scaling of the data and then computes either the median or mean for each cluster's MSI.
+#'
+#' @param CYTdata A `CYTdata` object containing the clustering and expression data.
+#' @param clustering A string specifying the name of the clustering column in the `cellClustering` data frame.
+#' @param clusters A vector of cluster labels (optional). If `NULL`, all clusters from `clustering` will be used.
+#' @param samples A vector of sample identifiers (optional). If `NULL`, all samples will be used.
+#' @param computeWith A string specifying whether to compute MSI based on "markers" or "DimRed". Defaults to "markers".
+#' @param markers A vector of marker names (optional). Used only when `computeWith = "markers"`.
+#' @param DimRed A string specifying the name of the dimensionality reduction method (optional). Used only when `computeWith = "DimRed"`.
+#' @param typeScaling A string specifying the type of scaling to apply. Options include:
+#'   - `"none"`: No scaling
+#'   - `"center"`: Center the data
+#'   - `"reduced"`: Apply reduced scaling
+#'   - `"center_reduced"`: Apply center and reduced scaling
+#'   - `"rescale_min_max"`: Rescale data to min-max scale
+#'   Defaults to `"none"`.
+#' @param rescaleQt A numeric vector of length 2 specifying the quantiles for rescaling. Defaults to `c(0.05, 0.95)`.
+#' @param rescaleBorders A numeric vector of length 2 specifying the borders for rescaling. Defaults to `c(0, 1)`.
+#' @param scaleByMetadata A string specifying a sample metadata column to scale by. Defaults to `NULL`, indicating no scaling by metadata.
+#' @param typeMSI A string specifying whether to compute MSI using the `"mean"` or `"median"` method. Defaults to `"median"`.
+#'
+#' @return A data frame with MSI values for each cluster, with rows representing clusters and columns representing features.
+#'
+#' @details
+#' The function computes the MSI (either mean or median) for each cluster based on the scaling of either marker expression data or dimensionality reduction (DimRed) data. If scaling by metadata is specified, the data is scaled separately for each metadata group before computing the MSI.
+#'
+#' The MSI values are computed for each cluster using the specified `clustering` column. Scaling options allow for different preprocessing steps to ensure that the data is appropriately transformed before computing MSI.
+#'
+#' @examples
+#' # Example: Compute MSI for clusters using marker data
+#' msi_values = computeMSI(CYTdata, clustering = "clusterColumn", computeWith = "markers", markers = c("marker1", "marker2"))
+#'
+#' # Example: Compute MSI for clusters using DimRed data
+#' msi_values = computeMSI(CYTdata, clustering = "clusterColumn", computeWith = "DimRed", DimRed = "PCA")
+#'
+#' @seealso
+#' \code{\link{exprsScaling}} for scaling the expression data, which is used in this function to preprocess data.
+#'
+#' @import checkmate
+#' @export
 
 computeMSI <- function(CYTdata,
                        clustering,
@@ -433,28 +338,122 @@ computeMSI <- function(CYTdata,
   return(data)
 }
 
-#' @title Identify cell cluster of having similar marker expressions using clustering techniques
+#' @title Perform Clustering on CYTdata
 #'
+#' @description
+#' This function performs clustering on the given CYTdata object using a variety of clustering algorithms. It allows clustering based on either markers or dimensionality reduction (DimRed) data and supports multiple clustering methods such as SOM, FlowSOM, KMeans, DBSCAN, and more. The function also provides options to preprocess the data using scaling and MSI computation before performing clustering.
 #'
-#' @description This function aims to generate coordinates of data in an 2D-reduced space, stored in a CYTdata object.
+#' @param CYTdata A `CYTdata` object containing the data to be clustered, including cell expression data, clustering data, and sample data.
+#' @param name A string specifying the name to assign to the resulting clustering.
+#' @param addPrefix A string prefix to prepend to each cluster label. Defaults to `"C"`.
+#' @param clusterWith A string specifying whether to perform clustering based on "markers" or "DimRed" (dimensionality reduction). Defaults to "markers".
+#' @param markers A vector of marker names used for clustering when `clusterWith = "markers"`. This is optional.
+#' @param DimRed A string specifying the name of the dimensionality reduction method used for clustering when `clusterWith = "DimRed"`. This is optional.
+#' @param clusterBy A string specifying whether to cluster by "cell" or by existing "clustering". Defaults to "cell".
+#' @param clustering A string specifying the clustering column to use when `clusterBy = "clustering"`. This is optional.
+#' @param typeScaling A string specifying the type of scaling to apply to the data before clustering. Options include:
+#'   - `"none"`: No scaling
+#'   - `"center"`: Center the data
+#'   - `"reduced"`: Apply reduced scaling
+#'   - `"center_reduced"`: Apply center and reduced scaling
+#'   - `"rescale_min_max"`: Rescale data to min-max scale
+#'   Defaults to `"none"`.
+#' @param rescaleQt A numeric vector of length 2 specifying the quantiles for rescaling. Defaults to `c(0.05, 0.95)`.
+#' @param rescaleBorders A numeric vector of length 2 specifying the borders for rescaling. Defaults to `c(0, 1)`.
+#' @param scaleByMetadata A string specifying a sample metadata column to scale by. Defaults to `NULL`, indicating no scaling by metadata.
+#' @param typeMSI A string specifying whether to compute MSI using the `"mean"` or `"median"` method. Defaults to `"median"`.
+#' @param type A string specifying the clustering algorithm to use. Options include:
+#'   - `"SOM"`
+#'   - `"FlowSOM"`
+#'   - `"Phenograph"`
+#'   - `"Hierarchical"`
+#'   - `"ConsensusHierarchical"`
+#'   - `"Spade"`
+#'   - `"DBSCAN"`
+#'   - `"Kmeans"`
+#'   - `"Kmedoids"`
+#'   - `"CLARA"`
+#'   - `"PhenoGMM"`
+#'   - `"Mean_shift"`
+#'   - `"flowMeans"`
+#'   Defaults to `"SOM"`.
+#' @param checkOverwrite A boolean indicating whether to check if the clustering already exists. If `TRUE`, will ask the user whether to overwrite the clustering. Defaults to `TRUE`.
+#' @param seed A numeric value to set the random seed for reproducibility. Defaults to 42.
+#' @param ... Additional arguments passed to the clustering algorithms. These arguments are passed to the specific clustering functions (e.g., `kohonen::som()`, `FlowSOM::FlowSOM()`, `stats::kmeans()`, etc.).
+#'   - **For SOM (`"SOM"`)**, additional arguments for the function `kohonen::som` include:
+#'     - `grid`: A `som.grid` object specifying the grid structure (e.g., a 2D grid).
+#'     - `rlen`: The number of learning iterations.
+#'     - `toroidal`: A boolean to specify whether the map should be toroidal.
+#'     - `alpha`: The learning rate.
+#'     - `radius`: The radius of influence of the neighboring units in the map.
+#'     - **Documentation**: [kohonen::som](https://cran.r-project.org/web/packages/kohonen/kohonen.pdf)
 #'
-#' The algorithm used available are :
-#' - Phenograph, a graph-based clustering technique
-#' - Self-Organizing Maps (SOM), a neural network-based clustering technique
-#' The whole set of cell markers or specific cell markers can be used during the clustering process.
-#' The cell clustering can be performed on the DimReduction.coordinates representation or based on marker expression.
+#'   - **For FlowSOM (`"FlowSOM"`)**, additional arguments for the function `FlowSOM::FlowSOM` include:
+#'     - `colsToUse`: A vector of column names to use for clustering.
+#'     - `xdim`, `ydim`: The dimensions of the grid (e.g., number of rows and columns).
+#'     - `maxNumberOfClusters`: The maximum number of clusters to generate.
+#'     - `seed`: The seed for random number generation.
+#'     - `normalize`: Logical value indicating if normalization should be applied before clustering.
+#'     - **Documentation**: [FlowSOM::FlowSOM](https://cran.r-project.org/web/packages/FlowSOM/FlowSOM.pdf)
 #'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param markers a character vector providing the cell markers to use to generate the cluster data. By default, all markers are used
-#' @param type a character value containing the type of clustering method to use. Possible values are: "Phenograph", "SOM" (default = Phenograph)
-#' @param seed a numeric value providing the random seed to use during stochastic operations
-#' @param ... additional arguments passed on to method from R package.
-#' For SOM, please refer to som method from kohonen package : https://cran.r-project.org/web/packages/kohonen/kohonen.pdf
-#' For DBSCAN, please refer to dbscan method from dbscan package :
-#' For Phenograph, please refer to cytof_cluster method from cytofkit2 package : Rphenograph_k = 30 (ne fonctionne pas en dessous de 15 ?)
+#'   - **For K-means (`"Kmeans"`)**, additional arguments for the function `stats::kmeans` include:
+#'     - `centers`: The number of clusters or initial centroids.
+#'     - `nstart`: The number of random starts to use.
+#'     - `iter.max`: The maximum number of iterations.
+#'     - `algorithm`: The algorithm to use (e.g., `"Lloyd"`, `"Forgy"`).
+#'     - **Documentation**: [stats::kmeans](https://www.rdocumentation.org/packages/stats)
 #'
-#' @return a S4 object of class 'CYTdata'
+#'   - **For DBSCAN (`"DBSCAN"`)**, additional arguments for the function `dbscan::dbscan` include:
+#'     - `eps`: The maximum distance between two points for them to be considered as in the same neighborhood.
+#'     - `minPts`: The minimum number of points required to form a dense region.
+#'     - **Documentation**: [dbscan::dbscan](https://cran.r-project.org/web/packages/dbscan/dbscan.pdf)
 #'
+#'   - **For Phenograph (`"Phenograph"`)**, additional arguments for the function `cytofkit2::Rphenograph` include:
+#'     - `k`: The number of nearest neighbors to use.
+#'     - `ncpus`: The number of CPUs to use for parallel processing.
+#'     - **Documentation**: [cytofkit2::Rphenograph](https://cran.r-project.org/web/packages/cytofkit2/cytofkit2.pdf)
+#'
+#'   - **For CLARA (`"CLARA"`)**, additional arguments for the function `cluster::clara` include:
+#'     - `k`: The number of clusters to form.
+#'     - `samples`: The number of samples to randomly select from the data (used for faster clustering).
+#'     - `metric`: The distance measure used to calculate distances between observations.
+#'     - **Documentation**: [cluster::clara](https://cran.r-project.org/web/packages/cluster/cluster.pdf)
+#'
+#'   - **For Kmedoids (`"Kmedoids"`)**, additional arguments for the function `cluster::pam` (used for K-medoids) include:
+#'     - `k`: The number of clusters to form.
+#'     - `metric`: The distance metric to use.
+#'     - `clustering`: A logical value indicating whether to compute the clustering.
+#'     - **Documentation**: [cluster::pam](https://cran.r-project.org/web/packages/cluster/cluster.pdf)
+#'
+#' @return A list containing:
+#'   - `"CYTdata"`: The updated `CYTdata` object with the new clustering added.
+#'   - `"opts"`: A list of options and objects related to the clustering process.
+#'
+#' @details
+#' This function performs clustering on the data contained in the `CYTdata` object. The user can choose to cluster based on either marker expression or dimensionality reduction data. It supports a variety of clustering algorithms and provides options for scaling and MSI computation. The function also checks if a clustering with the specified name already exists and prompts the user to overwrite it if necessary.
+#'
+#' Clustering algorithms available include:
+#' - SOM (Self-Organizing Maps)
+#' - FlowSOM
+#' - Phenograph
+#' - Hierarchical
+#' - DBSCAN (Density-Based Spatial Clustering)
+#' - K-means
+#' - K-medoids (PAM)
+#' - CLARA (Clustering Large Applications)
+#' - and others.
+#'
+#' @examples
+#' # Example: Perform clustering using K-means on markers data
+#' result = runClustering(CYTdata, name = "Kmeans_clustering", type = "Kmeans", clusterWith = "markers", markers = c("marker1", "marker2"))
+#'
+#' # Example: Perform clustering using DBSCAN on DimRed data
+#' result = runClustering(CYTdata, name = "DBSCAN_clustering", type = "DBSCAN", clusterWith = "DimRed", DimRed = "PCA")
+#'
+#' @seealso
+#' \code{\link{computeMSI}} for computing MSI before clustering.
+#'
+#' @import checkmate
 #' @export
 
 runClustering <- function(CYTdata,
@@ -632,7 +631,7 @@ runClustering <- function(CYTdata,
                               cluster_columns = as.dendrogram(hierarchicalObject$hclustEvents),
                               column_split = nlevels(CYTdata@clusteringData@cellClustering[,name]),
                               cluster_rows =  as.dendrogram(hierarchicalObject$hclustFeatures),
-                              top_annotation = HeatmapAnnotation(df = dfClusters, col = CYTdata@clusteringData@clusteringPalette))
+                              top_annotation = ComplexHeatmap::HeatmapAnnotation(df = dfClusters, col = CYTdata@clusteringData@clusteringPalette))
     }
   }
 
@@ -641,108 +640,45 @@ runClustering <- function(CYTdata,
 }
 
 
-#' @title Identify meta cluster of clusters & Heatmap
-#'
-#'
-#' @description This function aims to identify meta clusters, which are groups of clusters having similar expressions for selected markers. It allows to visualize the cluster marker expressions using heatmap.
-#'
-#' The mean of median marker expressions is computed for each cluster, and marker expressions displayed using a categorical heatmap (5 categories are defined by default).
-#' The range expression of each cell marker is discretized into several categories between bounds of marker expressions.
-#' To hierarchical clustering, shown using dendrogramm, can be computed on both marker and cluster levels.
-#' Clustering method performed is Hierarchical clustering
-#' Several clustering criterion are available such as Wald, Medoid, ...
-#'
-#' @param data a S4 object of class 'CYTdata'
-#' @param N_Hierarchical a numeric value providing the number of metaclusters expected
-#' @param criterion a string value providing the agglomeration method to be use.
-#' Possible values are: 'ward.D', 'ward.D2', 'single', 'complete', 'average', 'mcquitty', 'median' or 'centroid'
-#' Please refer to the function 'hclust' of the 'stats' package
-#'
-#'
-#' @return a S4 object of class 'CYTdata'
-#'
-#' @export
-#'
-#'
-
-doHierarchical <- function(data,
-                           N_Hierarchical,
-                           criterion = c("ward.D", "ward.D2", "single", "complete", "average", "mcquitty", "median", "centroid")) {
-  checkmate::qassert(N_Hierarchical, "N1")
-  if (N_Hierarchical>=nrow(data) | N_Hierarchical<2) {
-    stop("Error : N_Hierarchical argument of doHierarchical function is set to", N_Hierarchical,
-         " but must be an integer between 2 and the number of events to cluster (", nrow(data), ").")
-  }
-  criterion = match.arg(criterion)
-  checkmate::qassert(criterion, "S1")
-
-  ### Hclust for events (clusters, cells)
-  dataDist = stats::dist(data)
-  dataDist[dataDist==0] = 0.000001
-  hclustEvents = stats::hclust(dataDist, method = criterion)
-  isoMDSord = MASS::isoMDS(dataDist, k = 1)$points
-  hclustEvents = dendextend::rotate(hclustEvents, rownames(isoMDSord)[order(isoMDSord)])
-  labelEvents = hclustEvents$labels[hclustEvents$order]
-
-  cutreeClusters = stats::cutree(hclustEvents, k = N_Hierarchical)
-  cutreeClusters = structure(match(cutreeClusters, unique(cutreeClusters[hclustEvents$labels[hclustEvents$order]])), names = names(cutreeClusters))
-  ClustersBelong = cutreeClusters[rownames(data)]
-
-  ### Hclust for features
-  dataDist = stats::dist(t(data))
-  dataDist[dataDist==0] = 0.000001
-  hclustFeatures = stats::hclust(dataDist, method = criterion)
-
-  return(list("ClustersBelong" = ClustersBelong, "hclustEvents" = hclustEvents, "hclustFeatures" = hclustFeatures))
-}
-
-#' @title
-#'
+#' @title Add Manual Clustering to CYTdata
 #'
 #' @description
+#' This function allows the user to manually add a new clustering to the CYTdata object. The new clustering is stored in the \code{cellClustering} slot, and an optional color palette can be provided for visualization. The function also checks if the specified clustering name already exists and prompts the user for confirmation if overwrite is allowed.
 #'
-#' @param
+#' @param CYTdata An object of class \code{CYTdata}. It should contain clustering data in the \code{cellClustering} slot.
+#' @param name A character string specifying the name of the new clustering to be added. This will be used as the column name in the \code{cellClustering} slot.
+#' @param clusteringIDs A vector of clustering identifiers (IDs) to assign to cells. The length of this vector should match the number of cells in the \code{CYTdata} object.
+#' @param additionalPalette (optional) A vector specifying custom colors for the new clustering. The number of colors should match the number of unique clustering IDs. If \code{NULL}, the default color palette will be applied using \code{rainbow}.
+#' @param checkOverwrite A logical value indicating whether to prompt the user for confirmation if a clustering with the same name already exists in the \code{cellClustering} slot. Default is \code{TRUE}.
 #'
+#' @return An updated \code{CYTdata} object with the new clustering added to the \code{cellClustering} slot. The associated color palette for the clustering is also stored in the \code{clusteringPalette} list.
 #'
-#' @return
+#' @details
+#' The function checks if the specified clustering name already exists in the \code{cellClustering} slot of the \code{CYTdata} object. If the name exists and \code{checkOverwrite} is \code{TRUE}, the user will be asked if they want to overwrite the existing clustering. If the user confirms, the existing clustering will be replaced with the new one.
 #'
-#' @export
+#' If no custom palette is provided, the function will generate a default color palette using the \code{rainbow} function.
 #'
+#' @examples
+#' # Example usage
+#' CYTdata <- addManualClustering(CYTdata = CYTdata,
+#'                                 name = "newClustering",
+#'                                 clusteringIDs = c(1, 2, 1, 3, 2, 1),
+#'                                 checkOverwrite = TRUE)
 #'
-
-doPhenograph <- function(data) {
-  stop()
-}
-
-
-#' @title Identify meta cluster of clusters & Heatmap
+#' # Using custom color palette
+#' customPalette <- c("red", "green", "blue")
+#' CYTdata <- addManualClustering(CYTdata = CYTdata,
+#'                                 name = "customClustering",
+#'                                 clusteringIDs = c(1, 2, 1, 3, 2, 1),
+#'                                 additionalPalette = customPalette,
+#'                                 checkOverwrite = TRUE)
 #'
+#' @seealso \code{\link{checkValidity}}, \code{\link{qassert}}
 #'
-#' @description This function aims to identify meta clusters, which are groups of clusters having similar expressions for selected markers. It allows to visualize the cluster marker expressions using heatmap.
-#'
-#' The mean of median marker expressions is computed for each cluster, and marker expressions displayed using a categorical heatmap (5 categories are defined by default).
-#' The range expression of each cell marker is discretized into several categories between bounds of marker expressions.
-#' To hierarchical clustering, shown using dendrogramm, can be computed on both marker and cluster levels.
-#' Clustering method performed is Hierarchical clustering
-#' Several clustering criterion are available such as Wald, Medoid, ...
-#'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param N_Metaclusters a numeric value providing the number of metaclusters expected
-#' @param N_NewClusters a numeric value providing the number of phenotypic NewClusters expected
-#' @param markers a character vector providing the marker names to use. By default, all markers are used
-#' @param medoid.param a string value providing the type of cluster's markers expression used ("median" or "mean", "median" by default)
-#' @param rescale.bounds a numeric vector providing the bounds ( in [0,1]) for rescale step
-#' @param criterion a string value providing the agglomeration method to be use.
-#' Possible values are: 'ward.D', 'ward.D2', 'single', 'complete', 'average', 'mcquitty', 'median' or 'centroid'
-#' Please refer to the function 'hclust' of the 'stats' package
-#' @param seed.order.hclust a numeric value providing the random seed to use during stochastic operations
-#' @param nb.cat.heatmap a numeric value specifying the number of categories to use
-#'
-#'
-#' @return a S4 object of class 'CYTdata'
+#' @import checkmate
+#' @importFrom utils readline
 #'
 #' @export
-#'
 
 addManualClustering <- function(CYTdata,
                                 name,
@@ -762,7 +698,7 @@ addManualClustering <- function(CYTdata,
   CYTdata@clusteringData@cellClustering[,name] = clusteringIDs
   if (is.null(additionalPalette)) {
     CYTdata@clusteringData@clusteringPalette[[name]] = structure(rainbow(nlevels(CYTdata@clusteringData@cellClustering[,name])),
-                                                                           names = levels(CYTdata@clusteringData@cellClustering[,name]))
+                                                                 names = levels(CYTdata@clusteringData@cellClustering[,name]))
   } else {
     CYTdata@clusteringData@clusteringPalette[[name]] = additionalPalette
   }
@@ -771,54 +707,40 @@ addManualClustering <- function(CYTdata,
   return(CYTdata)
 }
 
-
-
-#' @title Renames markers within a CYTdata object
+#' @title Plot Population Counts by Clustering and Metadata
 #'
-#' @description This function aims to rename cell markers stored within a CYTdata object.
+#' @description
+#' This function generates a stacked bar plot showing the number of cells per cluster, with colors representing the proportion of a metadata variable. It calculates the number of cells for each cluster, optionally groups them by metadata (e.g., sample groups), and visualizes the results.
 #'
-#' This function is interesting to remove the names of the fluorochromes or metals recorded during the acquisition process.
+#' @param CYTdata An object of class \code{CYTdata}. This should contain cell clustering data in the \code{cellClustering} slot and sample metadata in the \code{sampleMetadata} slot.
+#' @param clustering A character string specifying the name of the clustering to use. This should match a column name in the \code{cellClustering} slot.
+#' @param metadata A character string specifying the metadata column name from the \code{sampleMetadata} slot that will be used for coloring the plot.
+#' @param clusters A vector of cluster identifiers to be included in the plot. If \code{NULL}, all clusters are considered.
+#' @param sort A logical value indicating whether the clusters should be sorted by their total cell count. Default is \code{TRUE}.
+#' @param samples A vector of sample identifiers to filter the data. If \code{NULL}, all samples are considered.
 #'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param from a character vector providing the marker names to replace. By default, markers names from markers slot are replaced, in the order
-#' @param to a character vector providing the new marker names to use
+#' @return A \code{ggplot} object representing the stacked bar plot.
 #'
-#' @return a S4 object of class 'CYTdata'
+#' @details
+#' The function counts the number of cells per cluster for each sample. It then merges this count with the provided metadata and generates a stacked bar plot showing the count of cells for each cluster, colored by the metadata values. If the \code{sort} parameter is set to \code{TRUE}, the clusters are ordered by their total cell count in descending order.
 #'
-#'@export
+#' The plot provides a visual representation of the population distribution of cells within each cluster and how it relates to the metadata variable.
 #'
-
-updateClusteringLevels <- function(CYTdata, andPalette = TRUE) {
-  mdFrame = CYTdata@clusteringData@cellClustering %>% mutate(across(where(is.factor), droplevels))
-  palList = CYTdata@clusteringData@clusteringPalette
-  for (md in colnames(mdFrame)) { palList[[md]] = palList[[md]][levels(mdFrame[,md])] }
-  CYTdata@clusteringData@cellClustering = mdFrame
-  CYTdata@clusteringData@clusteringPalette = palList[colnames(mdFrame)]
-  return(CYTdata)
-}
-
-
-
-
-
-
-
-#' @title Plots the numbers of cells of each population (cluster or metacluster)
+#' @examples
+#' # Example usage
+#' plot <- plotPopulationCounts(CYTdata = CYTdata,
+#'                              clustering = "SampleClustering",
+#'                              metadata = "TreatmentGroup",
+#'                              sort = TRUE)
+#' print(plot)
 #'
-#' @description This function aims to visualize the number of cells associated to each population. The populations can be clusters or metaclusters
-#'
-#' This representation displays the population in the X-axis and the total number of associated cells in the Y-axis.
-#'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param population a character vector containing the identifiers of the population to use. By default, all the population are used
-#' @param level a character value indicating the type of population plotted. Possible values are: "clusters", "metaclusters". By default, 'clusters' are used.
-#' @param sort a boolean value indicating if population must be sorted by the number associated cluster
-#' @param color.metadata a character value specifying the metadat used to color the barplot. By default, color.metadata is set to NULL (the barplot color is uniform)
-#'
-#' @return a ggplot2 object
+#' @import dplyr
+#' @import ggplot2
+#' @import viridis
+#' @import reshape2
 #'
 #' @export
-#'
+
 plotPopulationCounts <- function(CYTdata,
                                  clustering,
                                  metadata,
@@ -829,16 +751,16 @@ plotPopulationCounts <- function(CYTdata,
   CYTdata = checkValidity(CYTdata, mode = "error")
 
   cellcount = getCellCount(CYTdata = CYTdata,
-               clustering = clustering, clusters = clusters,
-               samples = samples,
-               type = "cellcount")
+                           clustering = clustering, clusters = clusters,
+                           samples = samples,
+                           type = "cellcount")
 
 
   checkmate::qassert(sort, "B1")
   checkmate::qassert(metadata, "S1")
   if (!metadata %in% colnames(CYTdata@sampleData@sampleMetadata)) {
-  stop("Error : 'metadata' argument is not a sampleMetadata column name (available sampleMetadata column name/metadata : ",
-       paste0(colnames(CYTdata@sampleData@sampleMetadata), collapse=","), ")")
+    stop("Error : 'metadata' argument is not a sampleMetadata column name (available sampleMetadata column name/metadata : ",
+         paste0(colnames(CYTdata@sampleData@sampleMetadata), collapse=","), ")")
   }
 
   medoid = if (typeMSI == "median") median else mean
@@ -875,864 +797,107 @@ plotPopulationCounts <- function(CYTdata,
   return(plot)
 }
 
+######################################################## Utils ########################################################
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# plotSOMmap <- function(CYTdata){
-#   useSOMweights = FALSE
-#   checkmate::qassert(useSOMweights, "B1")
-#   if (useSOMweights) {
-#     if (level == "metaclusters") {
-#       stop("Error : SOM weights must be used but metaclusters cannot be determined using SOM")
-#     }
-#     if (is.null(CYTdata@Clustering@optionnal$SOMweights)) {
-#       stop("Error : No SOM weights available in Clustering slot.
-#            Impossible to use it for metaclustering")
-#     }
-#     SOMweights = CYTdata@Clustering@optionnal$SOMweights
-#     if (!identical(rownames(SOMweights),population)){
-#       stop("Error : SOM weights are inconsistent with clusters identifiers.")
-#     }
-#     markErr = setdiff(colnames(SOMweights), markers)
-#     if (length(markErr)>0) {
-#       stop("Error : Some markers selected for metaclustering are not available
-#            in SOMweights matrix (", paste0(markErr, collapse=" ,"), ").")
-#     }
-#     data = SOMweights[population,]
-#   }
-# }
-#
-# plotPhenograph <- function(CYTdata){
-#
-# }
-#
-# plotSpadeMST <- function(CYTdata){
-#
-# }
-
-#' BuildMST
-#'
-#' Build Minimal Spanning Tree
-#'
-#' Add minimal spanning tree description to the FlowSOM object
-#'
-#' @param fsom   FlowSOM object, as generated by \code{\link{BuildSOM}}
-#' @param silent If \code{TRUE}, no progress updates will be printed
-#' @param tSNE   If \code{TRUE}, an alternative t-SNE layout is computed as well
-#'
-#' @return FlowSOM object containing MST description
-#'
-#' @seealso \code{\link{BuildSOM}}, \code{\link{PlotStars}}
-#'
-#' @examples
-#' # Read from file, build self-organizing map
-#' fileName <- system.file("extdata", "68983.fcs", package="FlowSOM")
-#' flowSOM.res <- ReadInput(fileName, compensate=TRUE, transform = TRUE,
-#'                          scale = TRUE)
-#' flowSOM.res <- BuildSOM(flowSOM.res, colsToUse = c(9, 12, 14:18))
-#'
-#' # Build the Minimal Spanning Tree
-#' flowSOM.res <- BuildMST(flowSOM.res)
-#'
-#' @importFrom Rtsne Rtsne
-#'
-#' @export
-BuildMST <- function(fsom, silent = FALSE, tSNE = FALSE){
-
-  fsom$MST <- list()
-  if(!silent) message("Building MST\n")
-
-  adjacency <- as.matrix(stats::dist(fsom$map$codes, method = "euclidean"))
-  fullGraph <- igraph::graph.adjacency(adjacency,
-                                       mode = "undirected",
-                                       weighted = TRUE)
-  fsom$MST$graph <- igraph::minimum.spanning.tree(fullGraph)
-  ws <- igraph::edge.attributes(fsom$MST$graph)$weight
-  #normalize edge weights to match the grid size in coords (see below)
-  ws <- ws / mean(ws)
-  igraph::edge.attributes(fsom$MST$graph)$weight <- ws
-  fsom$MST$l <- igraph::layout.kamada.kawai(
-    coords = as.matrix(fsom$map$grid),
-    fsom$MST$graph)
-
-
-  if(tSNE){
-    fsom$MST$l2 <- Rtsne::Rtsne(fsom$map$codes)$Y
-    #library(RDRToolbox)
-    #fsom$MST$l2 <- Isomap(fsom$map$codes, dims = 2, k = 3)[[1]]
-  }
-
-  library(vegan)
-  data(BCI, BCI.env)
-  BCI
-  vegan::diversity(BCI, index = "simpson")
-
-  return(fsom)
+updateClusteringLevels <- function(CYTdata, andPalette = TRUE) {
+  mdFrame = CYTdata@clusteringData@cellClustering %>% mutate(across(where(is.factor), droplevels))
+  palList = CYTdata@clusteringData@clusteringPalette
+  for (md in colnames(mdFrame)) { palList[[md]] = palList[[md]][levels(mdFrame[,md])] }
+  CYTdata@clusteringData@cellClustering = mdFrame
+  CYTdata@clusteringData@clusteringPalette = palList[colnames(mdFrame)]
+  return(CYTdata)
 }
 
+checkorderClustering <- function(CYTdata, clustering, clusters = NULL, order = TRUE, checkDuplicates = TRUE){
 
+  #CYTdata = checkValidity(CYTdata, mode = "error")
+  checkmate::qassert(clustering, "S1")
+  checkmate::qassert(clusters, c(0, "S*"))
+  checkmate::qassert(order, "B1")
+  checkmate::qassert(checkDuplicates, "B1")
 
+  if (nrow(CYTdata@clusteringData@cellClustering)==0 && ncol(CYTdata@clusteringData@cellClustering)==0) { stop("Error : clusteringData slot is empty") }
 
+  if (!clustering %in% colnames(CYTdata@clusteringData@cellClustering)) {
+    stop("Error : 'clustering' argument is not a clustering column in cellClustering dataframe (clustering columns :", paste0(colnames(CYTdata@clusteringData@cellClustering), collapse = ", "), ").")
+  }
 
+  clusterID = levels(CYTdata@clusteringData@cellClustering[,clustering])
+  if (is.null(clusters)) { clusters = clusterID }
 
-
-
-
-#' @title Plot compare cluster
-#'
-#' @description This function aims to visualise the expression of a given marker in each cluster.
-#'
-#' @param CYTdata a CYTdata object
-#' @param clusters1 a character vector containing the identifier of the cluster to use
-#' @param clusters2 a character vector containing the identifier of the cluster to use
-#'
-#' @return a ggplot2 object
-#'
-#' @export
-#'
-plotCompareClusters <- function(CYTdata,
-                                clusters1,
-                                clusters2) {
-
-  checkmate::qassert(clusters1, "S1")
-  checkmate::qassert(clusters2, "S1")
-
-  matrix.exp <- CYTdata@matrix.expression
-  cluster <- CYTdata@identify.clusters
-
-  proj <- cbind(matrix.exp, cluster)
-
-  parameters <- colnames(proj)
-  markers <- parameters[!parameters %in% c("cluster")]
-
-  exp.values.clusters1 <- proj[proj$cluster %in% clusters1, ]
-  exp.values.clusters2 <- proj[proj$cluster %in% clusters2, ]
-
-  exp.values.clusters <- rbind(exp.values.clusters1, exp.values.clusters2)
-
-  melt.matrix <- reshape::melt(exp.values.clusters, id.vars = c("cluster"))
-
-  plot <- ggplot2::ggplot() +
-    ggplot2::geom_density(data = melt.matrix,
-                          mapping = ggplot2::aes_string(x = "value",
-                                                        fill = "cluster"),
-                          size = 0.5,
-                          alpha = 0.8) +
-    ggplot2::facet_wrap(~variable)
-
-  plot <- plot +
-    ggplot2::scale_fill_manual(values = c("#ff0000", "#0000ff")) +
-    ggplot2::scale_x_continuous(limits = c(-2, 6), breaks = c(-2:6)) +
-    ggplot2::scale_y_continuous(labels = function(x) {format(round(x, 1),nsmall = 1)})
-
-  plot <- plot +
-    ggplot2::theme_bw() +
-    ggplot2::theme(
-      plot.title = ggplot2::element_text(hjust = 0.5, size = 10, face = "bold"),
-      axis.title.x = ggplot2::element_blank(),
-      axis.title.y = ggplot2::element_blank(),
-      panel.grid.minor = ggplot2::element_blank(),
-      panel.grid.major = ggplot2::element_blank(),
-      legend.position = "bottom",
-      legend.key.width = grid::unit(0.35, "cm"))
-
-  return(plot)
+  if (checkDuplicates) {
+    clustersdup = clusters[duplicated(clusters)]
+    if (length(clustersdup)>0) { stop("Error : 'clusters' argument contain duplicated values ( ", paste0(clustersdup, collapse = ", "), " ). It must be vector of unique clusters of" , clustering, "column.") }
+  }
+  splErr = setdiff(clusters, clusterID)
+  if (length(splErr)>0) { stop("Error in CYTdata object, clusteringData slot: 'clusters' argument providing clusters", paste0(splErr, collapse=", "), "not present in", clustering, "column of cellClustering dataframe") }
+  if (order) { clusters = clusterID[clusterID %in% clusters] }
+  return(clusters)
 }
 
-#' @title Plots of a distogram of marker co-expression
-#'
-#' @description This function aims to visualize the pairwise co-expression between all markers using a distogram representation.
-#' Each tile corresponds to the co-expression between two markers and is gradient-colored based on the Pearson or Spearman correlation
-#'
-#' @param CYTdata a CYTdata object
-#' @param clusters a character vector containing the identifier of the cluster to use
-#' @param method a character value indicating the name of correlation method to use
-#'
-#' @return a ggplot2 object
-#'
-#' @export
-#'
-plotDistogram <- function(CYTdata,
-                          markers = NULL,
-                          population = NULL,
-                          level = c("clusters", "metaclusters"),
-                          samples = NULL,
-                          method = c("pearson","spearman"),
-                          palette = NULL) { #c("yellow", "orange", "red", "brown")
-
-  if (class(CYTdata)!="CYTdata") { stop("Error : argument 'CYTdata' a S4 object of class 'CYTdata'.") }
-  else { validObject(CYTdata) }
-
-  markers = checkorderMarkers(CYTdata, markers, order=FALSE, checkDuplicates=TRUE)
-
-  level = match.arg(level)
-  checkmate::qassert(level, "S1")
-  population = checkorderPopulation(CYTdata, population=population, level=level,
-                                    order=TRUE, checkDuplicates=TRUE)
-  samples = checkorderSamples(CYTdata, samples,
-                              order=TRUE, checkDuplicates=TRUE)
-
-  method = match.arg(method)
-  checkmate::qassert(method, "S1")
-
-  if(level == "clusters") { popId = CYTdata@Clustering@clusters }
-  else { popId = CYTdata@Metaclustering@metaclusters }
-
-  data = subset(CYTdata@matrix.expression[,markers],
-                popId %in% population & CYTdata@samples %in% samples)
-
-  corMatrix = round(stats::cor(data, method = method), 3)
-  dist = stats::as.dist(1 - corMatrix)
-  hc = stats::hclust(dist)
-  corMatrix = corMatrix[hc$order, hc$order]
-  corMatrix[upper.tri(corMatrix, diag = TRUE)] = NA
-
-  print(corMatrix)
-
-  dimnames(corMatrix) = NULL
-  corMatrixmelted = reshape2::melt(corMatrix)
-
-  print(corMatrixmelted)
-
-  plot <- ggplot2::ggplot(data = corMatrixmelted,
-                          ggplot2::aes_string(x = "Var1",
-                                              y = "Var2",
-                                              fill = "value")) +
-    ggplot2::ggtitle("Distogram") +
-    ggplot2::geom_tile(color = "white")
-
-  checkmate::qassert(palette, c("0", "S*"))
-  if(!is.null(palette)){
-    if(!all(areColors(palette))){
-      stop("Error : 'palette' argument (", paste0(palette, collapse = ","),
-           ") does not contain only hexadecimal color.)")
-    }
-    plot <- plot + ggplot2::scale_fill_gradientn(colours = palette, na.value = "white", name = paste(method, "correlation"))
-  }
-  else {
-    plot <- plot + ggplot2::scale_fill_gradient2(low = "green", high = "red", mid = "black",
-                                                 midpoint = 0, limit = c(-1, 1), na.value = "white",
-                                                 name = paste(method, "correlation"),
-                                                 oob = scales::oob_squish)
+exprsScaling <- function(data,
+                         typeScaling = c("none", "center", "reduced", "center_reduced", "rescale_min_max"),
+                         rescaleQt = c(0.05, 0.95), rescaleBorders = c(0,1)) {
+  typeScaling = match.arg(typeScaling)
+  checkmate::qassert(typeScaling, "S1")
+  checkmate::qassert(rescaleBorders, "N2")
+  checkmate::qassert(rescaleQt, "N2")
+  if (any(rescaleQt<=0) || any(rescaleQt>=1)) {
+    stop("Error : rescaleQt argument must be a vector a 2 integer between 0 and 1.")
   }
 
-  plot <- plot +
-    ggplot2::annotate(geom = "text",
-                      x = seq(1, length(markers)),
-                      y = seq(1, length(markers)),
-                      angle = -45,
-                      size = 4,
-                      label = markers,
-                      hjust = 1) +
-    ggplot2::coord_fixed() +
-    ggplot2::theme(
-      plot.title = ggplot2::element_text(hjust = 0.5),
-      plot.background = ggplot2::element_blank(),
-      axis.title.x = ggplot2::element_blank(),
-      axis.title.y = ggplot2::element_blank(),
-      axis.text.x = ggplot2::element_blank(),
-      axis.text.y = ggplot2::element_blank(),
-      axis.ticks = ggplot2::element_blank(),
-      axis.line = ggplot2::element_blank(),
-      panel.background = ggplot2::element_blank(),
-      panel.border = ggplot2::element_blank(),
-      panel.grid.minor = ggplot2::element_blank(),
-      panel.grid.major = ggplot2::element_blank(),
-      legend.justification = c(1, 0),
-      legend.position = c(0.4, 0.7),
-      legend.direction = "horizontal",
-      legend.key = ggplot2::element_blank()) +
-    ggplot2::guides(fill = ggplot2::guide_colorbar(barwidth = 7,
-                                                   barheight = 1,
-                                                   title.position = "top",
-                                                   title.hjust = 0.5))
-
-  rownames(corMatrix) = markers
-  colnames(corMatrix) = markers
-  return(list("distogram" = plot,
-              "cor" = corMatrix))
+  sca <- function(exp) {
+    switch(typeScaling,
+           none = {exp = exp},
+           center = {exp = scale(exp, center=T, scale=F)},
+           reduced = {exp = scale(exp, center=F, scale=T)},
+           center_reduced = {exp = scale(exp, center=T, scale=T)},
+           rescale_min_max = {
+             quantiles = stats::quantile(exp, probs = rescaleQt)
+             low = quantiles[1]
+             high = quantiles[2]
+             exp[exp<low] = low
+             exp[exp>high] = high
+             exp = scales::rescale(exp, from = c(low, high), to = rescaleBorders)
+           })
+    return(exp)
+  }
+  data = data %>% mutate_all(sca)
+  return(data)
 }
 
-
-
-
-
-
-
-
-
-
-#' @title  Computes the percentage of clusters with sufficient number of cells
-#'
-#' @description This function aims to :
-#'
-#'  - Compute and show cell clusters having a number of associated cells greater than a specific threshold
-#'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' level = c("clusters", "metaclusters")
-#' @param thSize a numeric value providing the minimum number of cells needed for a cluster to be considered a small cluster (default value = 50)
-#'
-#' @return a list containing QC size features
-#'
-#' @export
-#'
-#'
-#'# @param sort a boolean value indicating if clusters must be sorted by the number associated cells
-
-computePopulation_SizeQC <- function(CYTdata,
-                                     population = NULL,
-                                     level = c("clusters", "metaclusters"),
-                                     thSize = 50,
-                                     generateHeatmap = FALSE){
-
-  if (class(CYTdata)!="CYTdata") { stop("Error : argument 'CYTdata' a S4 object of class 'CYTdata'.") }
-  else { CYTdata = MakeValid(CYTdata, verbose = TRUE) }
-
-  level = match.arg(level)
-  checkmate::qassert(level, "S1")
-  population = checkorderPopulation(CYTdata=CYTdata, population=population, level=level, order=TRUE, checkDuplicates=TRUE)
-
-  checkmate::qassert(thSize, "N1")
-  if (thSize<=0) { stop("Error : 'thSize'  argument must be positive integer.") }
-  checkmate::qassert(generateHeatmap, "B1")
-
-  if (level == "clusters"){ cellcount = CYTdata@Clustering@cellcount[population,] }
-  else { cellcount = CYTdata@Metaclustering@cellcount[population,] }
-
-  effectif = apply(cellcount, 1, sum)
-  vectorScores = as.logical(effectif > thSize)
-  score = mean(vectorScores)*100
-
-  res = list("cellcount" = cellcount,
-             "vectorScores" = vectorScores,
-             "thSize" = thSize,
-             "score" = score)
-
-  if (generateHeatmap){
-    cat("\n\n Generating heatmap of QCsize ..")
-    data = cbind.data.frame(cellcount, "total.cells" = vectorScores)
-    data = reshape2::melt(data.matrix(data))
-    colnames(data) = c("groupId", "samples", "count")
-    data$passed = TRUE
-    data$passed[as.logical(data$count < thSize)] = FALSE
-    data$count = NULL
-    title = paste("Quality control on", level, "size", sep = " ")
-    subtitle = paste("Percentage of", level, "having a sufficient number of cells =",
-                     format(round(score), nsmall = 2), "%", sep=" ")
-
-    heatmap <- ggplot2::ggplot() +
-      ggplot2::geom_tile(data = data,
-                         ggplot2::aes_string(x = "samples", y = "groupId", fill = "passed"),
-                         colour = "black") +
-      ggplot2::scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
-      ggplot2::geom_vline(xintercept = (length(unique(data$samples)) - 0.5), colour = "black", size = 2) +
-      ggplot2::scale_x_discrete(expand = c(0, 0)) + ggplot2::scale_y_discrete(expand = c(0, 0)) +
-      ggplot2::xlab("samples") + ggplot2::ylab("clusters") +
-      ggplot2::ggtitle(bquote(atop(.(title), atop(italic(.(subtitle)), "")))) +
-      ggplot2::theme_minimal() +
-      ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                     plot.background = ggplot2::element_blank(),
-                     axis.text.x = ggplot2::element_text(angle = 90, hjust = 1, vjust = 0.5),
-                     axis.line = ggplot2::element_blank(),
-                     panel.background = ggplot2::element_blank(),
-                     panel.border = ggplot2::element_blank(),
-                     panel.grid.minor = ggplot2::element_blank(),
-                     panel.grid.major = ggplot2::element_blank(),
-                     legend.title = ggplot2::element_blank(),
-                     legend.key = ggplot2::element_blank())
-    res$heatmap = heatmap
-  }
-
-  cat("\n\n - Percentage of ", level, " having at least ", thSize ," cells = ",
-      format(round(res$score, 2), nsmall = 2), "%\n\n")
-
-  return(res)
+doPhenograph <- function(data) {
+  stop()
 }
 
-#' @title  Computes the percentage of clusters with uniform phenotypes
-#'
-#' @description This function aims to :
-#'
-#'  - Identify and show cell clusters having a uniform phenotype (an unimodal expression and a low spread of expression for selected markers)
-#'
-#'  @details
-#'
-#' - Check unimodal expression : testing unimodal distribution of markers with a Hartigans test and check p-value
-#'
-#' - Check low spread of expression : check if a distribution of markers is not below the IQR threshold (interquantile range)
-#'
-#'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param thPvalue a numeric value providing the p-value threshold of the Hartigan's dip test (unimodal if pvalue > thPvalue)
-#' @param th.IQR a numeric value providing the IQR (interquartile range) threshold to assume a distribution as uniform
-#' @param th.good.cluster a numeric value providing the proportion threshold of markers expression distribution needed to pass the QC to assume a cluster as 'good'
-#' @param th.good.clustering a numeric value providing the proportion threshold of 'good' clusters needed to assume the clustering passing the QC
-#' @param ... arguments to pass onto "modetest" function from multimode package (https://www.rdocumentation.org/packages/multimode/versions/1.5/topics/modetest)
-#' method silvermann recommend parallelize
-#' @return a list containing QC uniform features
-#'
-#' @export
-#'
-#'
-
-computeQCuniform <- function(CYTdata,
-                             markers = NULL,
-                             population = NULL,
-                             level = c("clusters", "metaclusters"),
-                             aggregate = FALSE,
-                             thPvalue = 0.05,
-                             thIQR = 2,
-                             thGood = 0.75,
-                             method = c("Hartigan", "Silvermann"),
-                             NbSim = NULL,
-                             generateHeatmap = TRUE,
-                             sortQCbyMarkers = TRUE,
-                             generateEcdf = TRUE, # empirical cumulative distribution
-                             parallelize = FALSE,
-                             nbCores = NULL) {
-
-  if (class(CYTdata)!="CYTdata") { stop("Error : argument 'CYTdata' a S4 object of class 'CYTdata'.") }
-  else { CYTdata = MakeValid(CYTdata, verbose = TRUE) }
-
-  checkmate::qassert(thPvalue, "N1")
-  if (!(thPvalue>=0 && thPvalue<=1)) {
-    stop("Error : 'thPvalue' argument is a p-value threshold and must be a positive numeric between 0 and 1.")
+doHierarchical <- function(data,
+                           N_Hierarchical,
+                           criterion = c("ward.D", "ward.D2", "single", "complete", "average", "mcquitty", "median", "centroid")) {
+  checkmate::qassert(N_Hierarchical, "N1")
+  if (N_Hierarchical>=nrow(data) | N_Hierarchical<2) {
+    stop("Error : N_Hierarchical argument of doHierarchical function is set to", N_Hierarchical,
+         " but must be an integer between 2 and the number of events to cluster (", nrow(data), ").")
   }
-  checkmate::qassert(thIQR, "N1")
-  if (thIQR<=0) { stop("Error : 'thIQR' argument must be positive numerical value.") }
-  checkmate::qassert(thGood, "N1")
-  if (!(thGood>=0 && thGood<=1)) {
-    stop("Error : 'thPvalue' argument is a proportion threshold and must be a positive numeric between 0 and 1.")
-  }
-  method = match.arg(method)
-  checkmate::qassert(method, "S1")
-  checkmate::qassert(NbSim, c("0","N1"))
-  if (!is.null(NbSim) && NbSim<=0) { stop("Error : 'NbSim' argument must be positive integer.") }
-  checkmate::qassert(generateHeatmap, "B1")
-  checkmate::qassert(sortQCbyMarkers, "B1")
-  checkmate::qassert(generateEcdf, "B1")
-  checkmate::qassert(parallelize, "B1")
-  checkmate::qassert(nbCores, c("0","N1"))
-  if (!is.null(nbCores) && nbCores<=0) { stop("Error : 'nbCores' argument must be positive integer.") }
+  criterion = match.arg(criterion)
+  checkmate::qassert(criterion, "S1")
 
-  level = match.arg(level)
-  checkmate::qassert(level, "S1")
-  population = checkorderPopulation(CYTdata, population=population, level=level,
-                                    order=TRUE, checkDuplicates=TRUE)
-  markers = checkorderMarkers(CYTdata, markers=markers, order=TRUE, checkDuplicates=TRUE)
+  ### Hclust for events (clusters, cells)
+  dataDist = stats::dist(data)
+  dataDist[dataDist==0] = 0.000001
+  hclustEvents = stats::hclust(dataDist, method = criterion)
+  isoMDSord = MASS::isoMDS(dataDist, k = 1)$points
+  hclustEvents = dendextend::rotate(hclustEvents, rownames(isoMDSord)[order(isoMDSord)])
+  labelEvents = hclustEvents$labels[hclustEvents$order]
 
-  if (level == "clusters"){ popId = CYTdata@Clustering@clusters }
-  else { popId = CYTdata@Metaclustering@metaclusters }
+  cutreeClusters = stats::cutree(hclustEvents, k = N_Hierarchical)
+  cutreeClusters = structure(match(cutreeClusters, unique(cutreeClusters[hclustEvents$labels[hclustEvents$order]])), names = names(cutreeClusters))
+  ClustersBelong = cutreeClusters[rownames(data)]
 
-  switch(method,
-         Hartigan = {
-           if (is.null(NbSim)) NbSim = 2000
-           getPvalue <- function(x) return(diptest::dip.test(x, B=NbSim)$p.value)
-         },
-         Silvermann = {
-           if (is.null(NbSim)) NbSim = 20
-           getPvalue <- function(x) return(multimode::modetest(x, method="SI", B=NbSim)$p.value)
-         })
+  ### Hclust for features
+  dataDist = stats::dist(t(data))
+  dataDist[dataDist==0] = 0.000001
+  hclustFeatures = stats::hclust(dataDist, method = criterion)
 
-  if (length(population)==1) {
-    cat("'population' argument has length equal to 1, representing a single population.
-        \n Remark 1 : 'parallelize' argument is ignored here, no need to parallelize
-        computation for a single population.
-        \n Remark 2 : 'generateEcdf' argument is ignored also.")
-    data = CYTdata@matrix.expression[popId %in% population, markers]
-    IQR = apply(data, 2,
-                function(z){
-                  quantiles = stats::quantile(z)
-                  return(quantiles[4] - quantiles[2])})
-    names(IQR) = markers
-    pvalues = apply(data, 2, getPvalue)
-    names(pvalues) = markers
-
-    uniform = pvalues <= thPvalue & IQR <= thIQR
-    names(uniform) = markers
-
-    popScore = mean(uniform)*100
-    score = ifelse(popScore>=thGood*100, 100, 0)
-
-    res <- list("Pvalue" = IQR,
-                "IQR" =  pvalues,
-                "Uniform" = uniform,
-                "goodScores" = popScore,
-                "Score" = score,
-                "thPvalue" = thPvalue,
-                "thIQR" = thIQR,
-                "thGood" = thGood)
-
-    if (generateHeatmap){
-      data = data.frame("passed" = as.vector(uniform),
-                        "markers" = names(uniform))
-      res$heatmap <- ggplot2::ggplot() +
-        ggplot2::geom_tile(ggplot2::aes_string(x = "markers",
-                                               y = 1,
-                                               fill = "passed"),
-                           colour = "black", size = 0.25) +
-        ggplot2::ggtitle(label = paste("Uniform", level, "quality control", sep=" "),
-                         subtitle = paste("Percentage of markers passing the QC (for ",
-                                          level, " ", population, " ) : ", format(round(score, 2), nsmall = 2), "%")) +
-        ggplot2::scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
-        ggplot2::scale_x_discrete(expand = c(0, 0)) +
-        ggplot2::scale_y_discrete(expand = c(0, 0)) +
-        ggplot2::ylab(level) + ggplot2::xlab("Markers") +
-        ggplot2::theme_minimal() +
-        ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                       plot.background  = ggplot2::element_blank(),
-                       axis.text.x      = ggplot2::element_text(angle = 90, hjust = 1, vjust = 1),
-                       axis.line        = ggplot2::element_blank(),
-                       panel.background = ggplot2::element_blank(),
-                       panel.border     = ggplot2::element_blank(),
-                       panel.grid.minor = ggplot2::element_blank(),
-                       panel.grid.major = ggplot2::element_blank())
-    }
-  }
-  else {
-
-    data = cbind.data.frame("popId" = popId, CYTdata@matrix.expression[,markers])
-
-    IQR = plyr::ddply(subset(data, popId %in% population),
-                      "popId",
-                      function(y){
-                        apply(y[,-1], 2, function(z){
-                          quantiles = stats::quantile(z)
-                          return(quantiles[4] - quantiles[2])
-                        })
-                      })
-    rownames(IQR) = population
-    IQR$popId = NULL
-    print(IQR)
-
-    if(parallelize){
-      cat("'parallelize' argument set to TRUE, creating core clusters..")
-      maxCores = parallel::detectCores() - 1
-      if (is.null(nbCores)) nbCores = maxCores
-      if (nbCores > maxCores) stop("Error : nbCores argument require more cores than available.")
-
-      message("\n- Parallelization activated : Register the parallel backend using ",
-              nbCores, " cores...")
-      cl = parallel:makeCluster(nbCores)
-      doParallel::registerDoParallel(cl)
-
-      Pvalue = foreach(i = 1:length(population), .combine = 'rbind.data.frame') %dopar% {
-        pop = population[i]
-        subdata = data[data$popId == pop, -1]
-        pvalues = apply(subdata, 2, FUN = getPvalue)
-      }
-    }
-    else {
-      Pvalue = data.frame()
-      for (pop in population) {
-        subdata = data[data$popId == pop, -1]
-        pvalues = apply(subdata, 2, FUN = getPvalue)
-        Pvalue = rbind.data.frame(Pvalue, pvalues)
-      }
-    }
-
-    rownames(Pvalue) = population
-    colnames(Pvalue) = colnames(data)[-1]
-    print(Pvalue)
-    Uniform = data.frame(Pvalue <= thPvalue & IQR <= thIQR,
-                         check.names = FALSE)
-    print(Uniform)
-    rownames(Uniform) = population
-    print(Uniform)
-
-    popScores = apply(Uniform, 1, mean)*100
-    overallPassed = as.logical(as.vector(popScores) >= thGood*100)
-    score = mean(overallPassed)*100
-    res <- list("Pvalue" = Pvalue,
-                "IQR" =  IQR,
-                "Uniform" = Uniform,
-                "goodScores" = popScores,
-                "Score" = score,
-                "thPvalue" = thPvalue,
-                "thIQR" = thIQR,
-                "thGood" = thGood)
-
-    if (generateHeatmap) {
-
-      cat("\n\n Generating heatmap of QCuniform ..")
-
-      data = cbind.data.frame(Uniform, "overallPassed" = overallPassed)
-
-      if (sortQCbyMarkers) {
-        markersQC = apply(data[,-ncol(data)], 2, mean)*100
-        lev = c(names(markersQC)[order(markersQC, decreasing=TRUE)], "overallPassed")
-      }
-      else {
-        lev = colnames(Uniform)
-      }
-
-      data = reshape2::melt(data.matrix(data))
-      colnames(data) = c(level, "markers", "passed") # row must be cluster
-      data$passed = as.logical(data$passed)
-      data$markers = factor(data$markers, levels = lev)
-
-      res$heatmap = ggplot2::ggplot(data = data) +
-        ggplot2::geom_tile(ggplot2::aes_string(x = "markers",
-                                               y = level,
-                                               fill = "passed"),
-                           colour = "black", size = 0.25) +
-        ggplot2::ggtitle(label = paste("Uniform", level, "quality control", sep=" "),
-                         subtitle = paste("Percentage of", level, "being considered as 'good'",
-                                          level, ": ", format(round(score, 2), nsmall = 2), "%")) +
-        ggplot2::scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
-        ggplot2::scale_x_discrete(expand = c(0, 0)) +
-        ggplot2::scale_y_discrete(expand = c(0, 0)) +
-        ggplot2::ylab(level) + ggplot2::xlab("Markers") +
-        ggplot2::theme_minimal() +
-        ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                       plot.background  = ggplot2::element_blank(),
-                       axis.text.x      = ggplot2::element_text(angle = 90, hjust = 1, vjust = 1),
-                       axis.line        = ggplot2::element_blank(),
-                       panel.background = ggplot2::element_blank(),
-                       panel.border     = ggplot2::element_blank(),
-                       panel.grid.minor = ggplot2::element_blank(),
-                       panel.grid.major = ggplot2::element_blank())
-    }
-
-    if (generateEcdf) {
-
-      cat("\n\n Generating empirical cumulative distribution..")
-
-      res$ecdf = ggplot2::ggplot(data.frame("x" = popScores),
-                                 ggplot2::aes(x)) +
-        ggplot2::stat_ecdf(geom = "step", pad = FALSE) +
-        ggplot2::geom_vline(xintercept = thGood, colour = "red", size = 1, linetype = "longdash") +
-        ggplot2::geom_text(aes(x = thGood,
-                               y = 1,
-                               label = thGood),
-                           hjust = -1, colour = "red", size = 5) +
-        ggplot2::geom_hline(yintercept = score, colour = "red", size = 1) +
-        ggplot2::geom_text(aes(y = score,
-                               x = 1,
-                               label = score),
-                           vjust = -1, colour = "red", size = 5) +
-        ggplot2::xlab(paste("Good", level, "threshold value", sep=" ")) +
-        ggplot2::ylab(paste("Percentage of good", level, sep=" ")) +
-        ggplot2::ggtitle(paste("Percentage of good", level, "over good",
-                               level, "threshold value", sep=" ")) +
-        ggplot2::theme_minimal() +
-        ggplot2::theme(plot.title = ggplot2::element_text(size=15, hjust = 0.5),
-                       axis.title = ggplot2::element_text(size = 18),
-                       axis.text = ggplot2::element_text(size = 16))
-    }
-  }
-
-  cat("\n\n - Percentage of ", level, " having at least",
-      res$thGood ,"% of marker expression distribution passing the QC =",
-      format(round(res$Score, 2), nsmall = 2), "% \n\n")
-
-  return(res)
+  return(list("ClustersBelong" = ClustersBelong, "hclustEvents" = hclustEvents, "hclustFeatures" = hclustFeatures))
 }
-
-
-
-
-
-
-#' @title  Computes the percentage of clusters with sufficient number of cells
-#'
-#' @description This function aims to :
-#'
-#'  - Compute and show cell clusters having a number of associated cells greater than a specific threshold
-#'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' level = c("clusters", "metaclusters")
-#' @param THsize a numeric value providing the minimum number of cells needed for a cluster to be considered a small cluster (default value = 50)
-#'
-#' @return a list containing QC size features
-#'
-#' @export
-#'
-#'
-#'# @param sort a boolean value indicating if clusters must be sorted by the number associated cells
-
-computeQCsize <- function(CYTdata,
-                          level = c("clusters", "metaclusters"),
-                          THsize = 50,
-                          generateHeatmap = FALSE){
-
-  if (class(CYTdata)!="CYTdata") { stop("Error : argument 'CYTdata' a S4 object of class 'CYTdata'.")}
-  level = match.arg(level)
-  checkmate::qassert(level, "S1")
-  checkmate::qassert(THsize, "N1")
-  checkmate::qassert(generateHeatmap, "B1")
-
-  if (level == "clusters"){
-    subObject = CYTdata@Clustering
-    if (length(CYTdata@Clustering@clusters)==0) {
-      stop("Error : 'level' argument require clustering step to be performed. Please perform it")
-    }
-  }
-  else {
-    subObject = CYTdata@Metaclustering
-    if (length(CYTdata@Metaclustering@metaclusters)==0) {
-      stop("Error : 'level' argument require metaclustering step to be performed. Please perform it")
-    }
-  }
-
-  effectif = apply(subObject@cellcount, 1, sum)
-  vectorScores = as.logical(effectif > THsize)
-  score = mean(vectorScores)*100
-
-  res = list("cellcount" = subObject@cellcount,
-             "vectorScores" = vectorScores,
-             "THsize" = THsize,
-             "score" = score)
-
-  if (generateHeatmap){
-    data.heatmap = cbind.data.frame(subObject@cellcount, "total.cells" = clusters.effectif)
-    res$heatmap = heatmapQCsize(data.heatmap, THsize, score, level)
-  }
-
-  cat("\n\n - Percentage of ", level, " having at least ", res$THsize ," cells = ",
-      format(round(res$score, 2), nsmall = 2), "%\n\n")
-
-  return(res)
-}
-
-# Heatmap of size QC for clusters/metaclusters :
-# - Visualize the number of cells associated to each cluster, by samples
-# - Coloration using QC results
-# return a ggplot2 object
-
-heatmapQCsize <- function(data, THsize, score, level) {
-
-  cat("\n\n Generating heatmap of QCsize ..")
-
-  data = reshape2::melt(data.matrix(data))
-  colnames(data) = c("groupId", "samples", "count")
-  data$passed = TRUE
-  data$passed[as.logical(data$count < THsize)] = FALSE
-  data$count = NULL
-  title = paste("Quality control on", level, "size", sep = " ")
-  subtitle = paste("Percentage of", level, "having a sufficient number of cells =",
-                   format(round(score), nsmall = 2), "%", sep=" ")
-
-  heatmap <- ggplot2::ggplot() +
-    ggplot2::geom_tile(data = data,
-                       ggplot2::aes_string(x = "samples", y = "groupId", fill = "passed"),
-                       colour = "black") +
-    ggplot2::scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
-    ggplot2::geom_vline(xintercept = (length(unique(data$samples)) - 0.5), colour = "black", size = 2) +
-    ggplot2::scale_x_discrete(expand = c(0, 0)) + ggplot2::scale_y_discrete(expand = c(0, 0)) +
-    ggplot2::xlab("samples") + ggplot2::ylab("clusters") +
-    ggplot2::ggtitle(bquote(atop(.(title), atop(italic(.(subtitle)), "")))) +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                   plot.background = ggplot2::element_blank(),
-                   axis.text.x = ggplot2::element_text(angle = 90, hjust = 1, vjust = 0.5),
-                   axis.line = ggplot2::element_blank(),
-                   panel.background = ggplot2::element_blank(),
-                   panel.border = ggplot2::element_blank(),
-                   panel.grid.minor = ggplot2::element_blank(),
-                   panel.grid.major = ggplot2::element_blank(),
-                   legend.title = ggplot2::element_blank(),
-                   legend.key = ggplot2::element_blank())
-
-  return(heatmap)
-}
-
-lineplotQCuniform <- function(vectorScores, score, THgood, level) {
-
-  cat("\n\n Generating lineplot of QCuniform ..")
-
-  dataScores = data.frame("scores" = vectorScores,
-                          "threshold" = as.numeric(names(vectorScores)))
-
-  lineplot <- ggplot2::ggplot(dataScores, aes(x = threshold, y = scores)) +
-    ggplot2::geom_line() + ggplot2::geom_point() +
-    ggplot2::geom_vline(xintercept = THgood, colour = "red", size = 1, linetype = "longdash") +
-    ggplot2::geom_text(aes(x = THgood,
-                           y = min(dataScores$scores),
-                           label = THgood),
-                       hjust = -1, colour = "red", size = 5) +
-    ggplot2::geom_hline(yintercept = score, colour = "red", size = 1) +
-    ggplot2::geom_text(aes(y = score,
-                           x = (mean(dataScores$threshold) + min(dataScores$threshold))/2,
-                           label = score),
-                       vjust = -1, colour = "red", size = 5) +
-    ggplot2::xlab(paste("Good", level, "threshold value", sep=" ")) +
-    ggplot2::ylab(paste("Percentage of good", level, sep=" ")) +
-    ggplot2::ggtitle(paste("Percentage of good", level, "over good",
-                           level, "threshold value", sep=" ")) +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(plot.title = ggplot2::element_text(size=15, hjust = 0.5),
-                   axis.title = ggplot2::element_text(size = 18),
-                   axis.text = ggplot2::element_text(size = 16))
-
-  return(lineplot)
-}
-
-# Heatmap of QC for uniform phenotype cluster :
-# - Visualize the QC uniform results of clusters to each markers
-# - Coloration using QC results
-# return a ggplot2 object
-
-heatmapQCuniform <- function(score, dataHeatmap, level) {
-
-  cat("\n\n Generating heatmap of QCuniform ..")
-
-  data = reshape2::melt(data.matrix(dataHeatmap))
-  colnames(data) = c(level, "markers", "passed") # row must be cluster
-  data$passed = as.logical(data$passed)
-
-  markersQC = apply(dataHeatmap[,-ncol(dataHeatmap)], 2, mean)*100
-  lev = c(names(markersQC)[order(markersQC, decreasing=TRUE)], "QC_passed")
-  data$markers = factor(data$markers, levels = lev)
-
-  heatmap <- ggplot2::ggplot(data = data) +
-    ggplot2::geom_tile(ggplot2::aes_string(x = "markers",
-                                           y = level,
-                                           fill = "passed"),
-                       colour = "black", size = 0.25) +
-    ggplot2::ggtitle(label = paste("Uniform", level, "quality control", sep=" "),
-                     subtitle = paste("Percentage of", level, "being considered as 'good'",
-                                      level, ": ", format(round(score, 2), nsmall = 2), "%")) +
-    ggplot2::scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
-    ggplot2::scale_x_discrete(expand = c(0, 0)) +
-    ggplot2::scale_y_discrete(expand = c(0, 0)) +
-    ggplot2::ylab(level) + ggplot2::xlab("Markers") +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                   plot.background  = ggplot2::element_blank(),
-                   axis.text.x      = ggplot2::element_text(angle = 90, hjust = 1, vjust = 1),
-                   axis.line        = ggplot2::element_blank(),
-                   panel.background = ggplot2::element_blank(),
-                   panel.border     = ggplot2::element_blank(),
-                   panel.grid.minor = ggplot2::element_blank(),
-                   panel.grid.major = ggplot2::element_blank())
-
-  return(heatmap)
-}
-
 

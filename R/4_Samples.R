@@ -1,76 +1,37 @@
-#' @title Renames markers within a CYTdata object
+#' @title Rename Samples in CYTdata Object
 #'
-#' @description This function aims to rename cell markers stored within a CYTdata object.
+#' @description
+#' This function allows users to rename samples in a CYTdata object. The function can handle duplicate sample names, merge samples if necessary, and update the associated metadata.
 #'
-#' This function is interesting to remove the names of the fluorochromes or metals recorded during the acquisition process.
+#' @param CYTdata A CYTdata object that will be updated with the renamed samples.
+#' @param merge A logical value indicating whether to merge samples with duplicate names after renaming. Default is `FALSE`.
+#' @param from A character vector of current sample names to be renamed.
+#' @param to A character vector of new sample names corresponding to the names in the `from` argument.
+#' @return A modified CYTdata object with the samples renamed and metadata updated.
 #'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param from a character vector providing the marker names to replace. By default, markers names from markers slot are replaced, in the order
-#' @param to a character vector providing the new marker names to use
+#' @details
+#' This function renames samples in the `cellSample` dataframe of the CYTdata object. It also updates the associated sample metadata in the `sampleMetadata` slot.
+#' If there are duplicate sample names after renaming, the function can either stop execution or merge the samples based on the `merge` argument.
+#' If `merge` is `TRUE`, the samples with duplicate names are merged, and their metadata is handled accordingly:
+#' - If the name of the merged samples existed previously, the metadata of the existing sample is retained.
+#' - If the name of the merged sample was new, the metadata from the first renamed sample is retained.
 #'
-#' @return a S4 object of class 'CYTdata'
+#' The function also checks that the `from` and `to` arguments are the same length. If they are not, an error is raised.
 #'
-#'@export
+#' @examples
+#' # Example 1: Rename samples without merging
+#' updated_CYTdata <- renameSamples(CYTdata = cyt_data, from = c("Sample1", "Sample2"), to = c("NewSample1", "NewSample2"))
 #'
-
-checkorderSamples <- function(CYTdata, samples, order = TRUE, checkDuplicates = TRUE) {
-  #CYTdata = checkValidity(CYTdata, mode = "error")
-  checkmate::qassert(samples, c("0","S*"))
-  checkmate::qassert(order, "B1")
-  checkmate::qassert(checkDuplicates, "B1")
-  samplesId = levels(CYTdata@sampleData@cellSample$SampleID)
-  if (is.null(samples)) {
-    samples = samplesId
-  } else {
-    if (length(samples)==0) { stop("Error : 'samples' argument is an empty vector (length=0, but non NULL).") }
-    if (checkDuplicates) {
-      spddup = unique(samples[duplicated(samples)])
-      if (length(spddup)>0) { stop("Error : 'samples' argument contain duplicated values ( ", paste0(spddup, collapse = ", "), " ). It must be vector of unique samples levels.") }
-    }
-    splErr = setdiff(samples, samplesId)
-    if (length(splErr)>0) { stop("Error in CYTdata object, sampleData slot: 'samples' argument providing samples", paste0(splErr, collapse=", "), "not present in cellSample's SampleID column") }
-    if (order) { samples = samplesId[samplesId %in% samples] }
-  }
-  return(samples)
-}
-
-#' @title Renames markers within a CYTdata object
+#' # Example 2: Rename samples and merge duplicate samples
+#' updated_CYTdata <- renameSamples(CYTdata = cyt_data, from = c("Sample1", "Sample1"), to = c("MergedSample1", "MergedSample1"), merge = TRUE)
 #'
-#' @description This function aims to rename cell markers stored within a CYTdata object.
+#' @seealso
+#' \code{\link{checkValidity}} for validating the CYTdata object before and after renaming samples.
 #'
-#' This function is interesting to remove the names of the fluorochromes or metals recorded during the acquisition process.
-#'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param from a character vector providing the marker names to replace. By default, markers names from markers slot are replaced, in the order
-#' @param to a character vector providing the new marker names to use
-#'
-#' @return a S4 object of class 'CYTdata'
-#'
-#'@export
-#'
-
-updateMetadataLevels <- function(CYTdata, andPalette = TRUE) {
-  mdFrame = CYTdata@sampleData@sampleMetadata %>% mutate(across(where(is.factor), droplevels))
-  palList = CYTdata@sampleData@metadataPalette
-  for (md in colnames(mdFrame)) { palList[[md]] = palList[[md]][levels(mdFrame[,md])] }
-  CYTdata@sampleData@sampleMetadata = mdFrame
-  CYTdata@sampleData@metadataPalette = palList[colnames(mdFrame)]
-  return(CYTdata)
-}
-
-
-#' @title Renames samples within a CYTdata object
-#'
-#' @description This function aims to rename samples stored within a CYTdata object.
-#'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param from a character vector providing the sample names to replace. By default, all sample names are replaced
-#' @param to a character vector providing the new sample names to use
-#'
-#' @return a S4 object of class 'CYTdata'
-#'
-#'@export
-#'
+#' @import checkmate
+#' @import dplyr
+#' @import plyr
+#' @export
 
 renameSamples <- function(CYTdata, merge = FALSE, from = NULL, to){
   CYTdata = checkValidity(CYTdata, mode = "error")
@@ -138,19 +99,41 @@ renameSamples <- function(CYTdata, merge = FALSE, from = NULL, to){
   return(CYTdata)
 }
 
-#' @title Renames samples within a CYTdata object
+#' @title Reorder Samples levels in CYTdata Object
 #'
-#' @description This function aims to rename samples stored within a CYTdata object.
+#' @description
+#' This function allows users to reorder the samples in a CYTdata object either alphabetically or based on a user-provided order.
+#' The reordering will apply to both the sample identifiers (`SampleID`) and the associated metadata in the `sampleMetadata` slot.
 #'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param from a character vector providing the sample names to replace. By default, all sample names are replaced
-#' @param to a character vector providing the new sample names to use
+#' @param CYTdata A CYTdata object containing the cytometry data. The object must be valid before and after reordering the samples.
+#' @param alphabetic A logical value indicating whether the samples should be reordered alphabetically. If `TRUE`, the samples will be sorted alphabetically by `SampleID`.
+#' If `FALSE`, the user must provide a custom ordering in `newOrder`.
+#' @param newOrder A character vector specifying the custom order of the samples. This argument is required if `alphabetic` is `FALSE`.
 #'
-#' @return a S4 object of class 'CYTdata'
+#' @return A modified CYTdata object with reordered samples. The sample order will be reflected in both the `SampleID` column of `cellSample` and the rows of `sampleMetadata`.
 #'
-#'@export
+#' @details
+#' This function allows users to control the order of samples in the `CYTdata` object. If `alphabetic` is set to `TRUE`, the samples are sorted in lexicographical order
+#' based on their `SampleID` values. If `alphabetic` is set to `FALSE`, the function expects the `newOrder` argument to provide a custom order for the samples.
 #'
+#' The function also updates the `sampleMetadata` to reflect the new sample order.
 #'
+#' If `newOrder` is provided but does not match the available samples, the function will raise an error.
+#'
+#' @examples
+#' # Example: Reorder samples alphabetically
+#' reordered_data <- reorderSamples(CYTdata = cyt_data, alphabetic = TRUE)
+#'
+#' # Example: Reorder samples based on a custom order
+#' custom_order <- c("SampleB", "SampleA", "SampleC")
+#' reordered_data <- reorderSamples(CYTdata = cyt_data, alphabetic = FALSE, newOrder = custom_order)
+#'
+#' @seealso
+#' \code{\link{checkValidity}} for validating the CYTdata object before and after reordering.
+#'
+#' @import checkmate
+#' @import gtools
+#' @export
 
 reorderSamples <- function(CYTdata, alphabetic = TRUE, newOrder = NULL){
   CYTdata = checkValidity(CYTdata, mode = "error")
@@ -166,29 +149,47 @@ reorderSamples <- function(CYTdata, alphabetic = TRUE, newOrder = NULL){
   CYTdata = checkValidity(CYTdata, mode = "warning")
 }
 
-#' @title Numbers of cells for each sample
+#' @title Sample Counts and Plot for CYTdata Object
 #'
-#' @description This function aims to visualize the number of cells associated to each sample.This representation displays the samples in the X-axis and the number of associated cells in the Y-axis.
-#' Several statistics can be computed and shown.
+#' @description
+#' This function computes the number of cells per sample in a CYTdata object and generates a plot with key statistical indicators such as mean, median, quantiles, and min/max values. It can optionally filter and sort the samples.
+#'
+#' @param CYTdata A CYTdata object containing sample data.
+#' @param samples A character vector of sample names to include in the analysis. If `NULL`, all samples are used.
+#' @param sort A logical value indicating whether the resulting data should be sorted in descending order by the number of cells (default is `TRUE`).
+#' @return A ggplot2 plot visualizing the number of cells per sample along with key statistical metrics.
 #'
 #' @details
-#' The following statistic can be computed:
-#' -'min' corresponds to the lowest number of cells within a data set
-#' -'q25' corresponds to the number of cells separates the quantiles 25% within data set
-#' -'median' corresponds to the number of cells separates the lower half from the upper half within data set
-#' -'mean' corresponds to the number of cells quantity shared within data set
-#' -'q75' corresponds to the number of cells separates the quantiles 75% within data set
-#' -'max' corresponds to the largest number of cells within a data set
+#' This function calculates the number of cells in each sample and then creates a plot to visualize the cell counts. The plot includes the following statistical lines:
+#' - **Mean**: Green line
+#' - **Min**: Blue line
+#' - **25th Percentile (q25)**: Purple line
+#' - **Median**: Red line
+#' - **75th Percentile (q75)**: Purple line
+#' - **Max**: Blue line
 #'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param stats a character vector providing the statistics to display. Possible values are: 'min', 'median', 'mean', 'q75', 'max'
-#' @param samples a character vector containing the names of biological samples to use. By default, all samples are used
-#' @param sort a boolean value indicating if samples must be sorted by the number of cells
+#' The function also includes data labels with the actual values of these metrics.
 #'
-#' @return a ggplot2 object
+#' If `samples` is provided, only the specified samples are considered. If `sort` is set to `TRUE`, the resulting data will be sorted by the number of cells in descending order.
 #'
+#' @examples
+#' # Example 1: Plot the cell counts for all samples
+#' cell_count_plot <- samplesCounts(CYTdata = cyt_data)
+#'
+#' # Example 2: Plot the cell counts for specific samples
+#' cell_count_plot <- samplesCounts(CYTdata = cyt_data, samples = c("Sample1", "Sample2"))
+#'
+#' # Example 3: Plot the cell counts without sorting
+#' cell_count_plot <- samplesCounts(CYTdata = cyt_data, sort = FALSE)
+#'
+#' @seealso
+#' \code{\link{checkValidity}} for validating the CYTdata object before generating the plot.
+#'
+#' @import checkmate
+#' @import plyr
+#' @import dplyr
+#' @import ggplot2
 #' @export
-#'
 
 samplesCounts <- function(CYTdata,
                           samples = NULL,
@@ -241,26 +242,39 @@ samplesCounts <- function(CYTdata,
 }
 
 
-#' @title Assigns meta-information about biological samples
+#' @title Import Sample Metadata into CYTdata Object
 #'
-#' @description This function aims to attach meta-information to each biological sample.
+#' @description
+#' This function allows users to import a sample metadata dataframe (`sampleMetadata_df`) into a CYTdata object.
+#' It also provides the option to overwrite existing sample metadata, convert columns to factors, and optionally specify a palette for metadata visualization.
 #'
-#' Especially, the following meta-information of each sample can be specified for subsequent analyses.
-#' - The biological individual
-#' - The biological condition (groups, vaccines, studies, etc.)
-#' - The timepoint
-#' Timepoint and Individual data must be specified.
+#' @param CYTdata A CYTdata object that will be updated with the new sample metadata.
+#' @param sampleMetadata_df A dataframe containing sample metadata. The columns of this dataframe should represent metadata variables associated with the samples.
+#' @param optionnalPalette An optional list providing custom palettes for metadata visualization. If `NULL`, a default palette using `rainbow` is applied to each metadata variable.
+#' @param checkOverwrite A logical value indicating whether to prompt the user to confirm overwriting existing sample metadata in the CYTdata object if it already exists. Default is `TRUE`.
 #'
-#' @param CYTdata a CYTdata object
-#' @param metadata a dataframe containing meta-information about the biological samples.
-#' The columns must contain, at least, a column named "Timepoint" and an other named "Individual".
-#' The rownames have to be the biological samples, thus the number rows has to be equal to the number of samples.
+#' @return A modified CYTdata object with the updated sample metadata and associated metadata palette.
 #'
-#' @return a S4 object of class 'CYTdata'
+#' @details
+#' This function updates the `sampleMetadata` slot of the `sampleData` component in the CYTdata object with the provided `sampleMetadata_df`.
+#' All columns in the `sampleMetadata_df` are converted to factors (if they are not already).
+#' If the `checkOverwrite` parameter is `TRUE` and the `sampleMetadata` slot is not empty, the user is prompted to confirm whether to overwrite the existing metadata.
+#' The function also updates the `metadataPalette` slot with a default palette or an optional custom palette provided by the user.
 #'
+#' @examples
+#' # Example: Import sample metadata with default palette and overwrite confirmation
+#' updated_CYTdata <- importsampleMetadata(CYTdata = cyt_data, sampleMetadata_df = metadata_df)
 #'
+#' # Example: Import sample metadata with a custom palette
+#' custom_palette <- list(SampleType = c("Type1" = "red", "Type2" = "blue"))
+#' updated_CYTdata <- importsampleMetadata(CYTdata = cyt_data, sampleMetadata_df = metadata_df, optionnalPalette = custom_palette)
+#'
+#' @seealso
+#' \code{\link{checkValidity}} for validating the CYTdata object before and after importing metadata.
+#'
+#' @import checkmate
+#' @import dplyr
 #' @export
-#'
 
 importsampleMetadata <- function(CYTdata, sampleMetadata_df, optionnalPalette = NULL, checkOverwrite = TRUE){
   CYTdata = checkValidity(CYTdata, mode = "error")
@@ -287,238 +301,34 @@ importsampleMetadata <- function(CYTdata, sampleMetadata_df, optionnalPalette = 
   return(CYTdata)
 }
 
+######################################################## Utils ########################################################
 
-#' @title Assigns meta-information about biological samples
-#'
-#' @description This function aims to attach meta-information to each biological sample.
-#'
-#' Especially, the following meta-information of each sample can be specified for subsequent analyses.
-#' - The biological individual
-#' - The biological condition (groups, vaccines, studies, etc.)
-#' - The timepoint
-#' Timepoint and Individual data must be specified.
-#'
-#' @param CYTdata a CYTdata object
-#' @param metadata a dataframe containing meta-information about the biological samples.
-#' The columns must contain, at least, a column named "Timepoint" and an other named "Individual".
-#' The rownames have to be the biological samples, thus the number rows has to be equal to the number of samples.
-#'
-#' @return a S4 object of class 'CYTdata'
-#'
-#'
-#' @export
-#'
-
-importsampleAdditionaldata <- function(CYTdata, sampleAdditionaldata_df, checkOverwrite = TRUE){
-  CYTdata = checkValidity(CYTdata, mode = "error")
-  checkmate::qassert(checkOverwrite, "B1")
-  checkmate::qassert(sampleAdditionaldata_df, "D*")
-  if (checkOverwrite && ncol(CYTdata@sampleData@sampleAdditionaldata)!=0) {
-    reply = readline(prompt="sampleAdditionaldata already present, do you still want to continue and overwrite (yes or no): ")
-    while (!tolower(reply) %in% c("yes", "y", "no", "n")) { reply <- readline(prompt="Reply not standard, please answer yes or no: ") }
-    if (tolower(reply) %in% c("no", "n")){ stop("Function stopped, CYTdata object unchanged") }
+checkorderSamples <- function(CYTdata, samples, order = TRUE, checkDuplicates = TRUE) {
+  #CYTdata = checkValidity(CYTdata, mode = "error")
+  checkmate::qassert(samples, c("0","S*"))
+  checkmate::qassert(order, "B1")
+  checkmate::qassert(checkDuplicates, "B1")
+  samplesId = levels(CYTdata@sampleData@cellSample$SampleID)
+  if (is.null(samples)) {
+    samples = samplesId
+  } else {
+    if (length(samples)==0) { stop("Error : 'samples' argument is an empty vector (length=0, but non NULL).") }
+    if (checkDuplicates) {
+      spddup = unique(samples[duplicated(samples)])
+      if (length(spddup)>0) { stop("Error : 'samples' argument contain duplicated values ( ", paste0(spddup, collapse = ", "), " ). It must be vector of unique samples levels.") }
+    }
+    splErr = setdiff(samples, samplesId)
+    if (length(splErr)>0) { stop("Error in CYTdata object, sampleData slot: 'samples' argument providing samples", paste0(splErr, collapse=", "), "not present in cellSample's SampleID column") }
+    if (order) { samples = samplesId[samplesId %in% samples] }
   }
-  cat("\n\nUpdating sampleAdditionaldata dataframe...")
-  CYTdata@sampleData@sampleAdditionaldata = sampleAdditionaldata_df
-  CYTdata = checkValidity(CYTdata, mode = "error")
-  return(CYTdata)
+  return(samples)
 }
 
-
-#' #' @title Assigns meta-information about biological samples
-#' #'
-#' #' @description This function aims to attach meta-information to each biological sample.
-#' #'
-#' #' Especially, the following meta-information of each sample can be specified for subsequent analyses.
-#' #' - The biological individual
-#' #' - The biological condition (groups, vaccines, studies, etc.)
-#' #' - The timepoint
-#' #' Timepoint and Individual data must be specified.
-#' #'
-#' #' @param CYTdata a CYTdata object
-#' #' @param metadata a dataframe containing meta-information about the biological samples.
-#' #' The columns must contain, at least, a column named "Timepoint" and an other named "Individual".
-#' #' The rownames have to be the biological samples, thus the number rows has to be equal to the number of samples.
-#' #'
-#' #' @return a S4 object of class 'CYTdata'
-#' #'
-#' #'
-#' #' @export
-#' #'
-#'
-#' renameMetadata <- function(CYTdata, metadata = NULL, from = NULL, to){
-#'   CYTdata = checkValidity(CYTdata, mode = "error")
-#'   if (nrow(CYTdata@sampleData@sampleMetadata)==0 && ncol(CYTdata@sampleData@sampleMetadata)==0) {
-#'     stop("Error : sampleData's sampleMetadata slot is empty")
-#'   }
-#'
-#'   checkmate::qassert(metadata, c(0, "S*"))
-#'   checkmate::qassert(to, "S*")
-#'   checkmate::qassert(merge, "B1")
-#'
-#'   if (is.null(metadata)) { # Rename columns
-#'     if (is.null(from)) { from = colnames(CYTdata@sampleData@sampleMetadata) }
-#'     else {
-#'       mdErr = setdiff(from, colnames(object@sampleData@sampleMetadata))
-#'       if (length(mdErr)>0) { stop("Error : 'from' argument contains names not present among sampleMetadata's metadata column names (", paste0(mdErr, collapse=", "), ".") }
-#'     }
-#'
-#'     if (length(from)!=length(to)) { stop("Error : Length of argument 'from' (", length(from), ") and argument 'to' (", length(to), ") must be equal") }
-#'     dupfrom = unique(from[duplicated(from)])
-#'     if (length(dupfrom)>0) { stop("Error : Argument 'from' contains duplicated metadata column names :", paste0(dupfrom, collapse=", ")) }
-#'     dupto = unique(to[duplicated(to)])
-#'     if (length(dupto)>0) { stop("Error : Argument 'to' containes duplicated names :", paste0(dupto, collapse=", ")) }
-#'
-#'     cat("\n\nCurrent sampleMetadata's metadata column names are (in the order) :", paste0(colnames(CYTdata@sampleData@sampleMetadata), collapse = ", "), "\n\n\nThe following columns :\n - ",
-#'         paste0(from, collapse=", "), "\n\nwill be renamed, in the order, by :\n - ", paste0(to, collapse=", "))
-#'
-#'     colnames(CYTdata@sampleData@sampleMetadata)[match(colnames(CYTdata@sampleData@sampleMetadata), from)] = to
-#'     names(CYTdata@sampleData@metadataPalette)[match(names(CYTdata@sampleData@metadataPalette), from)] = to
-#'     massage("Check unicity of meadata column names..")
-#'     CYTdata = checkValidity(CYTdata, mode = "warning")
-#'   }
-#'   else { # Rename metadata
-#'     if (!metadata %in% colnames(CYTdata@sampleData@sampleMetadata)) { stop("Error : 'metadata' argument (", metadata, ") is not NULL or a metadata column names") }
-#'     oldmdlev = levels(CYTdata@sampleData@sampleMetadata[,metadata])
-#'
-#'     if (is.null(from)) { from = oldmdlev }
-#'     else {
-#'       mdErr = setdiff(from, oldmdlev)
-#'       if (length(mdErr)>0) { stop("Error : 'from' argument contains metadata values not present among", metadata, "metadata values (", paste0(mdErr, collapse=", "), ".") }
-#'       dupfrom = unique(from[duplicated(from)])
-#'       if (length(dupfrom)>0) { stop("Error : Argument 'from' contains duplicated", metadata, "metadata values :", paste0(dupfrom, collapse=", ")) }
-#'     }
-#'
-#'     if (length(from)!=length(to)) { stop("Error : Length of argument 'from' (", length(from), ") and argument 'to' (", length(to), ") must be equal") }
-#'     if (length(to) == 1) { to = rep(to, length(from)) }
-#'     newmdlev = oldmdlev
-#'     newmdlev[match(from, newmdlev)] = to
-#'
-#'     levdup = unique(newmdlev[duplicated(newmdlev)])
-#'     if (length(levdup)>0){
-#'       message("After renaming, several ", metadata, "metadata values have the same name (",  paste0(levdup, collapse=", "), "), either by renaming to an already existing and unchanged metadata value, or by duplicate in the 'to' argument, or both.")
-#'       if (merge) { message("\nWarning : 'merge' argument is set to TRUE. After renaming,", metadata, " column of sampleMetadata dataframe get its duplicated levels merged.") }
-#'       else { stop("\nError : 'merge' argument is set to FALSE. CYTdata unchanged.") }
-#'     }
-#'     cat("\n\nCurrent", metadata, "values (levels) are (in the order) :", paste0(oldmdlev, collapse = ", "), "\n\n\nThe following values :\n - ", paste0(from, collapse=", "),
-#'         "\n\nwill be renamed, in the order, by :\n - ", paste0(to, collapse=", "))
-#'     CYTdata@sampleData@sampleMetadata[,metadata] = plyr::mapvalues(CYTdata@sampleData@sampleMetadata[,metadata], from = from, to = to)
-#'
-#'     message("After renaming,", metadata, "column of sampleMetadata dataframe contained duplicated value levels, which were merged. As it concerns metadataPalette : \n
-#'               - If the name of merged samples was already associated to an existing sample name before renaming, the metadata of the existing sample are the new metadata of newly renamed sample(s).\n
-#'               - If the name of merged samples was a new one (argument 'to' contain this name several times). The metadata of the resulting sample is the one of the sample contained in 'from' argument and which was ordered first (in 'from' argument) among all the samples renamed to this name.")
-#'     pal = CYTdata@sampleData@metadataPalette[metadata]
-#'     palnames = names(pal)
-#'     palnames[match(palnames, from)] = to
-#'     CYTdata@sampleData@metadataPalette[metadata] = structure(pal[!duplicated(palnames)], names = palnames[!duplicated(palnames)])
-#'     !duplicated(palnames)
-#'
-#'
-#'
-#'
-#'       newmd = data.frame()
-#'       for (spl in levels(CYTdata@sampleData@cellSample$SampleID)) {
-#'         fromspl = oldspllev[newspllev == spl]
-#'
-#'         if (length(fromspl)>1){ # if duplicated
-#'           message("Warning :", paste0(fromspl, collapse=", "), "samples have been merged into", spl, "sample.")
-#'           if (spl %in% fromspl) {
-#'             message("Warning :", spl, "sample original metadata has been conserved.")
-#'             metadataRow = oldmd[spl,]
-#'           } # sample name already present
-#'           else {
-#'             spl2 = from[to==spl][1]
-#'             message("Warning :", spl, "sample wasn't already present so no original metadata has been conserved. The metadata of the first sample, in the 'from' argument (", spl2, "), renamed to", spl, "has been conferred to", spl, ".")
-#'             metadataRow = oldmd[spl2,]
-#'           } # sample name not present, first sample
-#'         }
-#'         else {
-#'           if (spl %in% to) { metadataRow = oldmd[from[to==spl],] }
-#'           else { metadataRow = oldmd[spl,] }
-#'         }
-#'         newmd = rbind.data.frame(newmd, metadataRow)
-#'       }
-#'       rownames(newmd) = levels(CYTdata@sampleData@cellSample$SampleID)
-#'       CYTdata@sampleData@sampleMetadata = newmd
-#'     }
-#'
-#'     CYTdata = checkValidity(CYTdata, mode = "warning")
-#'     return(CYTdata)
-#'   }
-
-#' #' @title Assigns meta-information about biological samples
-#' #'
-#' #' @description This function aims to attach meta-information to each biological sample.
-#' #'
-#' #' Especially, the following meta-information of each sample can be specified for subsequent analyses.
-#' #' - The biological individual
-#' #' - The biological condition (groups, vaccines, studies, etc.)
-#' #' - The timepoint
-#' #' Timepoint and Individual data must be specified.
-#' #'
-#' #' @param CYTdata a CYTdata object
-#' #' @param metadata a dataframe containing meta-information about the biological samples.
-#' #' The columns must contain, at least, a column named "Timepoint" and an other named "Individual".
-#' #' The rownames have to be the biological samples, thus the number rows has to be equal to the number of samples.
-#' #'
-#' #' @return a S4 object of class 'CYTdata'
-#' #'
-#' #'
-#' #' @export
-#' #'
-#'
-#' reorderMetadata <- function(CYTdata, metadata, alphabetic = TRUE, newOrder = NULL){
-#'
-#'   CYTdata = checkValidity(CYTdata, mode = "error")
-#'   checkmate::qassert(alphabetic, "B1")
-#'
-#'   oldOrder = levels(CYTdata@sampleData@sampleMetadata[,metadata])
-#'   if (alphabetic) { newOrder = gtools::mixedsort(oldOrder) }
-#'   else {
-#'
-#'     if (is.null(newOrder)) { stop("Error : 'alphabetic' argument is set to FALSE but 'newOrder' argument is NULL.") }
-#'     mdErr = setdiff(newOrder, oldOrder)
-#'     if (length(mdErr)>0) { stop("Error : 'newOrder' argument contains metadata values not present among", metadata, "metadata values (Not present : ", paste0(mdErr, collapse=", "), ".") }
-#'     mdErr = setdiff(oldOrder, newOrder)
-#'     if (length(mdErr)>0) { stop("Error : 'newOrder' argument does not contain all metadata values present among", metadata, "metadata values (Missing : ", paste0(mdErr, collapse=", "), ".") }
-#'     dupnewOrder = unique(newOrder[duplicated(newOrder)])
-#'     if (length(dupnewOrder)>0) { stop("Error : Argument 'newOrder' contains duplicated", metadata, "metadata values :", paste0(dupnewOrder, collapse=", ")) }
-#'
-#'
-#'     CYTdata@sampleData@sampleMetadata[,metadata] = factor(CYTdata@sampleData@sampleMetadata[,metadata], levels = gtools::mixedsort(oldOrder))
-#'   }
-#'   CYTdata@sampleData@sampleMetadata[,metadata] = factor(CYTdata@sampleData@sampleMetadata[,metadata], levels = newOrder)
-#'   CYTdata = checkValidity(CYTdata, mode = "warning")
-#'   return(CYTdata)
-#' }
-
-#'
-#'
-#'
-#'
-#' getSamplesMetadata <- function(CYTdata, metadataCondition){
-#'
-#'   if (class(CYTdata)!="CYTdata") { stop("Error : argument 'CYTdata' a S4 object of class 'CYTdata'.") }
-#'   else { CYTdata = MakeValid(CYTdata, verbose = TRUE) }
-#'
-#'   checkmate::qassert(metadataCondition, "S1")
-#'
-#'   if (ncol(CYTdata@metadata)==0) {
-#'     stop("Error : No metadata slot present in CYTdata object")
-#'   }
-#'   if (!metadataCondition %in% colnames(CYTdata@metadata)){
-#'     stop("Error : 'metadataCondition' argument metadataCondition is not the
-#'          name of a column present in metadata (", paste0(colnames(CYTdata@metadata), collapse=","), ")")
-#'   }
-#'
-#'   metacondVect = CYTdata@metadata[[metadataCondition]]
-#'   res = lapply(levels(metacondVect),
-#'                FUN = function(co){
-#'                  spls = subset(CYTdata@metadata, metacondVect == co)
-#'                  return (rownames(spls))
-#'                })
-#'   names(res) = levels(metacondVect)
-#'   return(res)
-#' }
-
-
+updateMetadataLevels <- function(CYTdata) {
+  mdFrame = CYTdata@sampleData@sampleMetadata %>% mutate(across(where(is.factor), droplevels))
+  palList = CYTdata@sampleData@metadataPalette
+  for (md in colnames(mdFrame)) { palList[[md]] = palList[[md]][levels(mdFrame[,md])] }
+  CYTdata@sampleData@sampleMetadata = mdFrame
+  CYTdata@sampleData@metadataPalette = palList[colnames(mdFrame)]
+  return(CYTdata)
+}

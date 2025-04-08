@@ -1,62 +1,45 @@
-#' @title
+#' @title Rename Markers in CYTdata Object
 #'
 #' @description
+#' This function renames the markers (channels) in a CYTdata object. It allows users to specify a set of markers to be renamed and the corresponding new names.
+#' The function can also remove conjugate labels (e.g., parts of marker names separated by an underscore) before renaming.
 #'
-#' @param
+#' @param CYTdata A CYTdata object containing cytometry data. The object must be valid before and after renaming markers.
+#' @param cellSlot A string specifying which data slot to rename markers in. It can be either:
+#'  - "cellExprs" (default): The main expression data for the cells.
+#'  - "cellAdditionalexprs": Additional expression data associated with the cells.
+#' @param from A character vector of marker (channel) names to be renamed. The length of `from` should match the length of `to` (if not removing conjugates).
+#' @param to A character vector of new marker (channel) names corresponding to `from` (element-wise). The length of `to` must match the length of `from`.
+#' @param removeConjugate A boolean indicating whether to remove conjugate labels (e.g., part of the name before an underscore). Default is `FALSE`.
+#' @param sepConjugate A string defining the separator between the conjugate part and the main part of the marker name. Default is "_".
 #'
-#' @return
+#' @return A modified CYTdata object with the renamed markers in the specified `cellSlot`.
+#' If `removeConjugate` is `TRUE`, the conjugate part of the marker names will be removed before renaming.
 #'
+#' @details
+#' The function renames the markers in the specified data slot (`cellExprs` or `cellAdditionalexprs`) by matching the marker names provided in the `from` argument
+#' and replacing them with the corresponding names in the `to` argument. If the `removeConjugate` argument is set to `TRUE`, the function will ignore the `to` argument
+#' and remove the conjugate part of the marker names (i.e., everything before the specified separator, typically an underscore "_").
+#'
+#' If the lengths of `from` and `to` are mismatched (when `removeConjugate` is `FALSE`), the function will raise an error. The function also validates the `CYTdata` object
+#' before and after renaming to ensure its integrity.
+#'
+#' @examples
+#' # Example: Rename markers "FSC-A" and "SSC-A" to "FSC-A-New" and "SSC-A-New" in the 'cellExprs' slot
+#' renamed_data <- renameMarkers(CYTdata = cyt_data, markers = c("FSC-A", "SSC-A"),
+#'                               cellSlot = "cellExprs", from = c("FSC-A", "SSC-A"), to = c("FSC-A-New", "SSC-A-New"))
+#'
+#' # Example: Remove conjugate labels from marker names in the 'cellExprs' slot
+#' renamed_data <- renameMarkers(CYTdata = cyt_data, markers = c("CD3_A", "CD4_A"),
+#'                               cellSlot = "cellExprs", from = c("CD3_A", "CD4_A"), removeConjugate = TRUE)
+#'
+#' @seealso
+#' \code{\link{checkValidity}} for validating the CYTdata object.
+#'
+#' @import checkmate
+#' @import dplyr
+#' @import stringr
 #' @export
-#'
-
-checkorderMarkers <- function(CYTdata,
-                              markers,
-                              cellSlot = c("cellExprs", "cellAdditionalexprs"),
-                              order = TRUE, checkDuplicates = TRUE){
-
-  #CYTdata = checkValidity(CYTdata, mode = "error")
-  checkmate::qassert(markers, c("0","S*"))
-  cellSlot = match.arg(cellSlot)
-  checkmate::qassert(cellSlot, "S1")
-  checkmate::qassert(order, "B1")
-
-  if (!is.null(markers) && length(markers)==0) { stop("Error : markers argument is an empty vector (length=0, but non NULL).") }
-
-  checkmate::qassert(checkDuplicates, "B1")
-  if (checkDuplicates) {
-    markersdup = markers[duplicated(markers)]
-    if (length(markersdup)>0) {
-      stop("Error : markers argument contain duplicated values ( ", paste0(markersdup, collapse = ", "), " ). It must be vector of unique markers.")
-    }
-  }
-
-  if (cellSlot == "cellExprs") { markersId = colnames(CYTdata@cellData@cellExprs) }
-  else if (cellSlot == "cellAdditionalexprs") { markersId = colnames(CYTdata@cellData@cellAdditionalexprs) }
-
-  if (is.null(markers)) { markers = markersId }
-  else {
-    markErr = setdiff(markers, markersId)
-    if (length(markErr)>0) { stop("Error : 'markers' argument providing markers not present in", cellSlot, "'s colum names (", paste0(markErr, collapse=", "), ")") }
-    if (order) { markers = markersId[markersId %in% markers] }
-  }
-
-  return(markers)
-}
-
-#' @title Renames markers within a CYTdata object
-#'
-#' @description This function aims to rename cell markers stored within a CYTdata object.
-#'
-#' This function is interesting to remove the names of the fluorochromes or metals recorded during the acquisition process.
-#'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param from a character vector providing the marker names to replace. By default, markers names from markers slot are replaced, in the order
-#' @param to a character vector providing the new marker names to use
-#'
-#' @return a S4 object of class 'CYTdata'
-#'
-#'@export
-#'
 
 renameMarkers <- function(CYTdata,
                           cellSlot = c("cellExprs", "cellAdditionalexprs"),
@@ -102,18 +85,59 @@ renameMarkers <- function(CYTdata,
 }
 
 
-#' @title
+#' @title Transform CYTdata Object
 #'
 #' @description
+#' This function transforms the expression data in a CYTdata object using a specified transformation mode (e.g., arcsinh, logicle, or biexponential).
+#' The transformation is applied to the specified markers (channels) in either the `cellExprs` or `cellAdditionalexprs` slot of the CYTdata object.
+#' The function allows the user to define transformation parameters such as scaling and offsets.
 #'
-#' @param
-#' @return a S4 object of class 'CYTdata'
+#' @param CYTdata A CYTdata object containing cytometry data. The object must be valid before and after transformation.
+#' @param markers A character vector of marker (channel) names to apply the transformation to. If NULL, all markers will be transformed.
+#' @param mode A string specifying the transformation mode. It can be one of the following:
+#'  - "arcsinh" (default): Applies the arcsinh transformation to the data.
+#'  - "logicle": Placeholder for future implementation of the logicle transformation.
+#'  - "biexponential": Applies the biexponential transformation to the data.
+#' @param cellSlot A string specifying which data slot to transform. It can be either:
+#'  - "cellExprs" (default): The main expression data for the cells.
+#'  - "cellAdditionalexprs": Additional expression data associated with the cells.
+#' @param a A numeric parameter for the transformation. Default is 0.
+#' @param b A numeric parameter for the transformation. Default is 0.2.
+#' @param c A numeric parameter for the transformation. Default is 0.
+#' @param d A numeric parameter for the transformation. Default is 1.
+#' @param f A numeric parameter for the transformation. Default is 0.
+#' @param w A numeric parameter for the transformation. Default is 0.
 #'
-#' @importFrom checkmate qassert
-#' @importFrom flowCore read.FCS
+#' @return A transformed CYTdata object with the expression data in the specified `cellSlot` transformed according to the chosen mode and parameters.
+#' The resulting object contains the transformed expression data.
 #'
+#' @details
+#' The function applies different transformations to the data depending on the specified `mode`:
+#' - **"arcsinh"**: Applies the inverse hyperbolic sine transformation, defined as `arcsinh(a + b * x) + c`, where `x` is the expression value and `a`, `b`, `c` are parameters.
+#' - **"logicle"**: A placeholder for the logicle transformation (currently not implemented).
+#' - **"biexponential"**: Applies a biexponential transformation defined as `a * exp(b * (x - w)) - c * exp(-d * (x - w)) + f`, where `x` is the expression value and `a`, `b`, `c`, `d`, `f`, and `w` are parameters.
+#'
+#' The function uses `mutate_at` from `dplyr` to apply the transformation to the specified markers.
+#'
+#' Note that the function performs validation on the `CYTdata` object before and after transformation using the `checkValidity` function.
+#' This ensures that the object is valid before processing and that any issues are flagged after the transformation.
+#'
+#' @examples
+#' # Example: Apply arcsinh transformation to markers "FSC-A" and "SSC-A" in the 'cellExprs' slot
+#' transformed_data <- transformCYTdata(CYTdata = cyt_data, markers = c("FSC-A", "SSC-A"),
+#'                                      mode = "arcsinh", cellSlot = "cellExprs", a = 0, b = 0.2, c = 0)
+#'
+#' # Example: Apply biexponential transformation with custom parameters
+#' transformed_data <- transformCYTdata(CYTdata = cyt_data, markers = c("CD3", "CD4"),
+#'                                      mode = "biexponential", cellSlot = "cellExprs", a = 1, b = 0.2, c = 0, d = 1, f = 0, w = 0)
+#'
+#' @seealso
+#' \code{\link{checkValidity}} for validating the CYTdata object.
+#'
+#' @import checkmate
+#' @import dplyr
+#' @importFrom methods new
 #' @export
-#'
 
 transformCYTdata <- function(CYTdata, markers = NULL, mode = c("arcsinh", "logicle", "biexponential"), cellSlot = c("cellExprs", "cellAdditionalexprs"), a=0, b=0.2, c=0, d=1, f=0, w=0){
 
@@ -147,89 +171,38 @@ transformCYTdata <- function(CYTdata, markers = NULL, mode = c("arcsinh", "logic
   return(CYTdata)
 }
 
+######################################################## Utils ########################################################
 
+checkorderMarkers <- function(CYTdata,
+                              markers,
+                              cellSlot = c("cellExprs", "cellAdditionalexprs"),
+                              order = TRUE, checkDuplicates = TRUE){
 
-# removeDuplicates <- function(CYTdata, markers = NULL) {
-#
-#   if (class(CYTdata)!="CYTdata") { stop("Error : argument 'CYTdata' a S4 object of class 'CYTdata'.") }
-#   else { CYTdata = MakeValid(CYTdata, verbose = TRUE) }
-#
-#   markers = checkorderMarkers(CYTdata, markers = markers, order = TRUE, checkDuplicates = TRUE)
-#   if (length(markers)!=ncol(CYTdata@matrix.expression)) {
-#     message("\nCells will be removed if their expression duplicated for combination of following markers : ", paste0(markers, collapse=", "))
-#   }
-#
-#   idxDuplicates = duplicated(CYTdata@matrix.expression[,markers])
-#   if (sum(idxDuplicates)==0) {
-#     message("\nNo duplicated data found, identical CYTdata object returned")
-#     return(CYTdata)
-#   }
-#   else {
-#     message("\n", sum(idxDuplicates), " cell(s) is/are duplicated. Removing it from CYTdata object..")
-#     gatedIdx = !idxDuplicates
-#     newmatrix.expression = subset(CYTdata@matrix.expression, gatedIdx)
-#
-#     newsamples = CYTdata@samples[gatedIdx]
-#     newsamples = droplevels(newsamples)
-#     removedSpls = setdiff(levels(CYTdata@samples), levels(newsamples))
-#     if(length(removedSpls)>0){
-#       cat("\n\n - Gating operation remove following samples :", paste0(removedSpls, collapse = ", "))
-#     }
-#
-#     cat("\n\n - Creating new CYTdata object..")
-#     newCYTdata = methods::new("CYTdata",
-#                               samples = newsamples,
-#                               matrix.expression = newmatrix.expression)
-#     if (ncol(CYTdata@raw.matrix.expression)>0) {
-#       newCYTdata@raw.matrix.expression = subset(CYTdata@raw.matrix.expression, gatedIdx)
-#     }
-#
-#     if (nrow(CYTdata@metadata)>0) {
-#       newCYTdata@metadata = subset(CYTdata@metadata, rownames(CYTdata@metadata) %in% levels(newCYTdata@samples))
-#     }
-#
-#     if(length(CYTdata@Clustering@clusters)>0){
-#       cat("\n\n - Updating Clustering slot")
-#       newClusters = CYTdata@Clustering@clusters[gatedIdx]
-#       newClusters = droplevels(newClusters)
-#       newpalette = CYTdata@Clustering@palette[levels(newClusters)]
-#       cat("\ncomputing new cell cluster count, abundance matrix...")
-#       newcellcount = compute.cellcount(newClusters, newsamples)
-#       newabundance = compute.abundance(newcellcount)
-#       cat("\nCreating new Clustering object")
-#       newCYTdata@Clustering = methods::new("Clustering",
-#                                            clusters = newClusters,
-#                                            cellcount = newcellcount,
-#                                            abundance = newabundance,
-#                                            palette = newpalette,
-#                                            optional_parameters = CYTdata@Clustering@optional_parameters)
-#       message("\n\nRemark : Clustering results are preserved during gating operation but it is recommended to the user to run a
-#         new clustering step with parameters adapted to the gated dataset")
-#     }
-#     if(length(CYTdata@Metaclustering@metaclusters)>0){
-#       cat("\n\n - Updating Metaclustering slot")
-#       newMetaclusters = CYTdata@Metaclustering@metaclusters[gatedIdx]
-#       newMetaclusters = droplevels(newMetaclusters)
-#       newpalette = CYTdata@Metaclustering@palette[levels(newMetaclusters)]
-#       cat("\ncomputing new cell metacluster count, abundance matrix...")
-#       newcellcount = compute.cellcount(newMetaclusters, newsamples)
-#       newabundance = compute.abundance(newcellcount)
-#       cat("\nCreating new Metaclustering object")
-#       newCYTdata@Metaclustering = methods::new("Metaclustering",
-#                                                metaclusters = newMetaclusters,
-#                                                cellcount = newcellcount,
-#                                                abundance = newabundance,
-#                                                palette = newpalette,
-#                                                optional_parameters = CYTdata@Metaclustering@optional_parameters)
-#     }
-#     if(nrow(CYTdata@DimReduction@coordinates)>0){
-#       cat("\n\n - Updating DimReduction slot")
-#       newcoordinates = subset(CYTdata@DimReduction@coordinates, gatedIdx)
-#       newCYTdata@DimReduction = methods::new("DimReduction",
-#                                              coordinates = newcoordinates,
-#                                              optional_parameters = CYTdata@DimReduction@optional_parameters)
-#     }
-#     validObject(newCYTdata)
-#     return(newCYTdata)
-#   }
-# }
+  #CYTdata = checkValidity(CYTdata, mode = "error")
+  checkmate::qassert(markers, c("0","S*"))
+  cellSlot = match.arg(cellSlot)
+  checkmate::qassert(cellSlot, "S1")
+  checkmate::qassert(order, "B1")
+
+  if (!is.null(markers) && length(markers)==0) { stop("Error : markers argument is an empty vector (length=0, but non NULL).") }
+
+  checkmate::qassert(checkDuplicates, "B1")
+  if (checkDuplicates) {
+    markersdup = markers[duplicated(markers)]
+    if (length(markersdup)>0) {
+      stop("Error : markers argument contain duplicated values ( ", paste0(markersdup, collapse = ", "), " ). It must be vector of unique markers.")
+    }
+  }
+
+  if (cellSlot == "cellExprs") { markersId = colnames(CYTdata@cellData@cellExprs) }
+  else if (cellSlot == "cellAdditionalexprs") { markersId = colnames(CYTdata@cellData@cellAdditionalexprs) }
+
+  if (is.null(markers)) { markers = markersId }
+  else {
+    markErr = setdiff(markers, markersId)
+    if (length(markErr)>0) { stop("Error : 'markers' argument providing markers not present in", cellSlot, "'s colum names (", paste0(markErr, collapse=", "), ")") }
+    if (order) { markers = markersId[markersId %in% markers] }
+  }
+
+  return(markers)
+}

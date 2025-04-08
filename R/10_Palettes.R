@@ -1,23 +1,36 @@
-#' @title Assigns meta-information about biological samples
+#' @title Change the Color Palette for Metadata or Clustering
 #'
-#' @description This function aims to attach meta-information to each biological sample.
+#' @description
+#' This function allows users to change the color palette used for metadata or clustering visualizations in the given `CYTdata` object. The palette can either be automatically generated using a rainbow color scale or defined by the user with a custom color palette.
 #'
-#' Especially, the following meta-information of each sample can be specified for subsequent analyses.
-#' - The biological individual
-#' - The biological condition (groups, vaccines, studies, etc.)
-#' - The timepoint
-#' Timepoint and Individual data must be specified.
+#' @param CYTdata An object of class \code{CYTdata} containing cytometry data and associated metadata or clustering information.
+#' @param type A character string specifying whether to change the palette for "metadata" or "clustering". Must be one of "metadata" or "clustering".
+#' @param metadata A character string specifying the metadata column name (if \code{type = "metadata"}). Ignored if \code{type = "clustering"}.
+#' @param clustering A character string specifying the clustering column name (if \code{type = "clustering"}). Ignored if \code{type = "metadata"}.
+#' @param autoColorRainbow A logical value indicating whether to automatically generate a rainbow palette (default is \code{TRUE}). If \code{FALSE}, the user must provide a custom palette via the \code{homemadePalette} parameter.
+#' @param homemadePalette A character vector of colors to be used as a custom palette (only used if \code{autoColorRainbow = FALSE}). Ignored if \code{autoColorRainbow = TRUE}.
 #'
-#' @param CYTdata a CYTdata object
-#' @param metadata a dataframe containing meta-information about the biological samples.
-#' The columns must contain, at least, a column named "Timepoint" and an other named "Individual".
-#' The rownames have to be the biological samples, thus the number rows has to be equal to the number of samples.
+#' @return The modified \code{CYTdata} object with the updated color palette for the specified metadata or clustering.
 #'
-#' @return a S4 object of class 'CYTdata'
+#' @details
+#' This function allows users to either:
+#' - Automatically generate a rainbow color palette for metadata or clustering using the `rainbow()` function, or
+#' - Provide a custom color palette by supplying a vector of color names or hexadecimal color codes in the `homemadePalette` argument.
 #'
+#' The function checks that the given metadata or clustering exists in the respective data slots of the `CYTdata` object and modifies the corresponding palette accordingly.
+#'
+#' @examples
+#' # Example usage:
+#' # Automatically generate a rainbow palette for metadata
+#' changePalette(CYTdata, type = "metadata", metadata = "cellType", autoColorRainbow = TRUE)
+#'
+#' # Provide a custom color palette for clustering
+#' changePalette(CYTdata, type = "clustering", clustering = "cluster1", autoColorRainbow = FALSE, homemadePalette = c("red", "blue", "green"))
+#'
+#' @import checkmate
+#' @importFrom methods stop
 #'
 #' @export
-#'
 
 changePalette <- function(CYTdata,
                           type = c("metadata", "clustering"),
@@ -67,16 +80,39 @@ changePalette <- function(CYTdata,
 }
 
 
-#' @title Get the samples associated to each value of a specific condition displayed in metadata data.frame
+#' @title Show Color Palettes for Metadata or Clustering
 #'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param metadataCondition a string specifying the metadata condition chosen. The string has to be the name of the column (in metadata data.frame) containing the condition chosen
+#' @description
+#' This function visualizes the color palette associated with either metadata or clustering information in the given `CYTdata` object. It allows users to view the color assignments for categories in metadata or clustering results and provides a plot to show the color distribution.
 #'
-#' @return a list containing the samples for each value of condition chosen
+#' @param CYTdata An object of class \code{CYTdata} containing cytometry data and associated metadata or clustering information.
+#' @param type A character string specifying whether to show the palette for "metadata" or "clustering". Must be one of "metadata" or "clustering".
+#' @param metadata A character string specifying the metadata column name (if \code{type = "metadata"}). Ignored if \code{type = "clustering"}.
+#' @param clustering A character string specifying the clustering column name (if \code{type = "clustering"}). Ignored if \code{type = "metadata"}.
+#' @param ncol An integer indicating the number of columns to display the palette in. Default is 10.
+#' @param labelSize A numeric value specifying the size of the labels displayed in the palette plot. Default is 5.
+#'
+#' @return A \code{ggplot} object displaying the color palette for the chosen metadata or clustering.
+#'
+#' @details
+#' This function extracts the color palette either from the metadata or the clustering information stored in the `CYTdata` object. It then arranges the colors in a grid format and labels each color with the corresponding category name. The plot shows the colors with the labels, allowing the user to see how each category is represented by color.
+#'
+#' The `ncol` parameter controls the number of columns in the palette plot, and `labelSize` adjusts the font size of the category labels on the plot.
+#'
+#' @examples
+#' # Example usage:
+#' # Display the color palette for a metadata column
+#' showPalettes(CYTdata, type = "metadata", metadata = "cellType", ncol = 5, labelSize = 6)
+#'
+#' # Display the color palette for a clustering result
+#' showPalettes(CYTdata, type = "clustering", clustering = "cluster1", ncol = 8, labelSize = 5)
+#'
+#' @import checkmate
+#' @import ggplot2
+#' @importFrom dplyr %>%
+#' @importFrom methods stop
 #'
 #' @export
-#'
-#'
 
 showPalettes <- function(CYTdata,
                          type = c("metadata", "clustering"),
@@ -132,16 +168,7 @@ showPalettes <- function(CYTdata,
   plot(plot)
 }
 
-#' @title Get the samples associated to each value of a specific condition displayed in metadata data.frame
-#'
-#' @param CYTdata a S4 object of class 'CYTdata'
-#' @param metadataCondition a string specifying the metadata condition chosen. The string has to be the name of the column (in metadata data.frame) containing the condition chosen
-#'
-#' @return a list containing the samples for each value of condition chosen
-#'
-#' @export
-#'
-#'
+############################################# Utils
 
 areColors <- function(x) {
   sapply(x, function(X) {
