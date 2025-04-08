@@ -1,16 +1,20 @@
 ---
-title: "How CytopipR works"
-author: "Paul Mazet"
-date: ""
-output: html_document
+output: github_document
 ---
 
 # Data Import
 
 ```{r}
 library(tidyverse) # str_subset, ddply, dplyr::select, %>% 
-install.packages("checkmate")
-library(checkmate)
+
+# cran_packages <- c("checkmate", "grid", "scales", "ggplot2", "gridExtra", "ggfortify", "ggridges", "grDevices", "RColorBrewer", "MASS", "Rtsne", "som", "kohonen", "devtools", "uwot", "cowplot", "reshape", "dgof", "coin", "tools", "colorspace", "ggpointdensity", "dendextend", "gtools", "methods")
+# install.packages(cran_packages)
+# 
+# bioconductor_packages <- c("ComplexHeatmap", "flowCore", "flowUtils", "ConsensusClusterPlus", "sva", "FlowSOM")
+# BiocManager::install(bioconductor_packages) 
+# 
+# github_packages <- c("JinmiaoChenLab/cytofkit2", "biosurf/cyCombine")
+# devtools::install_github(github_packages)
 ```
 
 ## FCS files
@@ -27,15 +31,6 @@ channelsInventory = checkFCS_getChannels(files, metadata)
 
 
 
-```{r}
-CYTdata1@cellData@cellExprs
-CYTdata1@sampleData@cellSample
-
-merge(CYTdata1@sampleData@cellSample, CYTdata1@cellData@cellExprs, by = "row.names")
-```
-
-
-
 
 ```{r, fig.heght = 18}
 channels = c(channelsInventory$completeChannels, channelsInventory$partialChannels)
@@ -43,15 +38,15 @@ print(channels)
 
 CYTdata1 = createCYTdata(files = files, data = NULL, format = "fcs", channels = channelsInventory$completeChannels, Ndownsampling = 1000)
 
+merge(CYTdata1@sampleData@cellSample, CYTdata1@cellData@cellExprs, by = "row.names")
+
 CYTdata1 = importsampleMetadata(CYTdata1, sampleMetadata_df = metadata, optionnalPalette = NULL, checkOverwrite = TRUE)
 
-CYTdata1@sampleData
+merge(CYTdata1@sampleData@cellSample, CYTdata1@cellData@cellExprs, by = "row.names") %>% merge(CYTdata1@sampleData@sampleMetadata %>% rownames_to_column("SampleID"), by = "SampleID")
 
 showPalettes(CYTdata1, type = "metadata", metadata = "Individual")
 CYTdata1 = changePalette(CYTdata1,  type = "metadata", metadata = "Individual", autoColorRainbow = F, homemadePalette = c("A" = "green", "B" = "blue"))
-CYTdata1@sampleData@metadataPalette
-
-merge(CYTdata1@sampleData@cellSample, CYTdata1@cellData@cellExprs, by = "row.names") %>% merge(CYTdata1@sampleData@sampleMetadata %>% rownames_to_column("SampleID"), by = "SampleID")
+showPalettes(CYTdata1, type = "metadata", metadata = "Individual")
 ```
 
 ## Summarized experiment
@@ -86,14 +81,8 @@ CYTdata2 = CYTdata2 %>%
   transformCYTdata(markers = NULL, mode = "arcsinh", cellSlot = "cellExprs") %>%
   transformCYTdata(markers = NULL, mode = "arcsinh", cellSlot = "cellAdditionalexprs")
 
-CYTdata2@sampleData@cellSample$SampleID %>% levels()
-metadata
 CYTdata2 = importsampleMetadata(CYTdata2, sampleMetadata_df = metadata[levels(CYTdata2@sampleData@cellSample$SampleID),], optionnalPalette = NULL, checkOverwrite = FALSE)
-```
 
-
-```{r}
-CYTdata2@sampleData@sampleMetadata
 showPalettes(CYTdata2, type = "metadata", metadata = "Individual")
 ```
 
@@ -112,9 +101,6 @@ CYTdata2 = runDimRed(CYTdata2,
                     n_components = 2, metric = "euclidean", scale = FALSE, n_neighbors = 20, min_dist = 0.01,
                     n_sgd_threads = 30, n_threads = 30, verbose = TRUE, checkOverwrite=FALSE)
 
-```
-
-```{r}
 plotCells(CYTdata2,
            expression = "DimRed", DimRed = "UMAP_1stTry",
            percentDownsampling = 0.75,
@@ -123,9 +109,9 @@ plotCells(CYTdata2,
            expression = "markers", coupleMarkers = c("CD45", "CD3"),
            percentDownsampling = 0.75,
            colorBy = "metadata", metadata = "Batch")
+```
 
-
-
+```{r}
 CYTdata2_corr = runcyCombine(CYTdata2, markers = lineageMarkers,
                              batchMetadata = "Batch", covarMetadata = "Group",
                              normMethod = "scale", tiesMethod = "average", seed = 92,
@@ -146,7 +132,6 @@ plotCells(CYTdata2_corr,
            expression = "markers", coupleMarkers = c("CD45", "CD3"),
            percentDownsampling = 0.75,
            colorBy = "metadata", metadata = "Batch")
-
 ```
 
 # Clustering
@@ -162,8 +147,6 @@ CYTdata2 = runClustering(CYTdata2,
 CYTdata2$opts
 CYTdata2 = CYTdata2$CYTdata
 
-CYTdata2@clusteringData@cellClustering
-
 merge(CYTdata2@sampleData@cellSample, CYTdata2@cellData@cellExprs, by = "row.names") %>% 
   column_to_rownames("Row.names") %>%  
   merge(CYTdata2@clusteringData@cellClustering, by = "row.names") %>%
@@ -172,12 +155,12 @@ merge(CYTdata2@sampleData@cellSample, CYTdata2@cellData@cellExprs, by = "row.nam
 
 showPalettes(CYTdata2,type = "clustering", clustering = "FlowSOM_1stTry_FlowSOM_metaclusters")
 
-checkgetMetaclutseringMembership(CYTdata = CYTdata2, clustering = "FlowSOM_1stTry_FlowSOM_SOMclusters",  metaclustering = "FlowSOM_1stTry_FlowSOM_metaclusters") %>% arrange(FlowSOM_1stTry_FlowSOM_metaclusters)
+checkgetMetaclusteringMembership(CYTdata = CYTdata2, clustering = "FlowSOM_1stTry_FlowSOM_SOMclusters",  metaclustering = "FlowSOM_1stTry_FlowSOM_metaclusters") %>% arrange(FlowSOM_1stTry_FlowSOM_metaclusters)
 ```
 
 
 ```{r, fig.height = 20, fig.width=26}
-df = checkgetMetaclutseringMembership(CYTdata = CYTdata2, clustering = "FlowSOM_1stTry_FlowSOM_SOMclusters",  metaclustering = "FlowSOM_1stTry_FlowSOM_metaclusters") %>%
+df = checkgetMetaclusteringMembership(CYTdata = CYTdata2, clustering = "FlowSOM_1stTry_FlowSOM_SOMclusters",  metaclustering = "FlowSOM_1stTry_FlowSOM_metaclusters") %>%
   column_to_rownames("FlowSOM_1stTry_FlowSOM_SOMclusters")
 
 data = CYTdata2 %>%
@@ -232,7 +215,7 @@ dev.off()
 
 CYTdata2 = CYTdata2$CYTdata
 
-df = checkgetMetaclutseringMembership(CYTdata = CYTdata2, clustering = "SOM_1stTry",  metaclustering = "SOM_1stTry_HCSubsets") %>%
+df = checkgetMetaclusteringMembership(CYTdata = CYTdata2, clustering = "SOM_1stTry",  metaclustering = "SOM_1stTry_HCSubsets") %>%
   column_to_rownames("SOM_1stTry")
 
 data = CYTdata2 %>%
@@ -288,10 +271,6 @@ plotCells(CYTdata2,
 ```
 
 
-```{r}
-CYTdata2@clusteringData@cellClustering
-```
-
 # Differential abundance analysis
 
 ```{r, warning=F}
@@ -323,7 +302,7 @@ plotVolcano(CYTdata2,
 
 # Gating function
 
-```{r, fig.height = 14, fig.width=18}
+```{r, fig.height = 10, fig.width=18}
 plotPiechart(CYTdata2,
              
              clustering = "FlowSOM_1stTry_FlowSOM_metaclusters",
@@ -369,3 +348,9 @@ plotPiechart(CYTdata22,
              colorBar = "#000000")
 
 ```
+
+
+```{r}
+
+```
+

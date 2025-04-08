@@ -59,6 +59,7 @@ checkFCS_getChannels <- function(files, metadata) {
   if (length(unique(as.vector(tab)))==2) { col=c("white", "grey") } else { col="grey" } # Couleurs : blanc pour 0, noir pour 1
   heatmap = ComplexHeatmap::Heatmap(t(tab), name = "Presence", cluster_columns = F, col = col,border = TRUE,
                                     row_names_side = "left", column_names_side = "top", heatmap_legend_param = list(title = "Presence"),
+                                    width = ncol(t(tab))*unit(1, "cm"), height = nrow(t(tab))*unit(0.8, "cm"),
                                     cell_fun = function(j, i, x, y, width, height, fill) { grid::grid.rect(x, y, width, height, gp = grid::gpar(fill = fill, col = "black")) },
                                     top_annotation = ComplexHeatmap::HeatmapAnnotation(df = metadata))
   return(list("tab" = tab, "Heatmap" = ComplexHeatmap::draw(heatmap),
