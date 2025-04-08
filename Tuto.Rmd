@@ -15,6 +15,9 @@ library(tidyverse) # str_subset, ddply, dplyr::select, %>%
 # 
 # github_packages <- c("JinmiaoChenLab/cytofkit2", "biosurf/cyCombine")
 # devtools::install_github(github_packages)
+
+# github_packages <- c()
+devtools::install_github("IDMIT-lab/CytopipR")
 ```
 
 ## FCS files
